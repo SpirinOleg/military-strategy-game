@@ -127,10 +127,10 @@ class GameViewModel(
         val unitStats = GameConstants.UNIT_STATS[unitType] ?: return
         if (currentState.playerPoints < unitStats.cost) return
 
-        // Создаем новый юнит рядом с КШМ игрока
+        // Создаем новый юнит рядом с КШМ игрока с большей зоной разброса для увеличенного поля
         val spawnPosition = Position(
-            x = GameConstants.PLAYER_COMMAND_POST_POSITION.x + 50f + (Math.random().toFloat() * 100f),
-            y = GameConstants.PLAYER_COMMAND_POST_POSITION.y - 50f + (Math.random().toFloat() * 100f)
+            x = GameConstants.PLAYER_COMMAND_POST_POSITION.x + 100f + (Math.random().toFloat() * 200f),
+            y = GameConstants.PLAYER_COMMAND_POST_POSITION.y - 100f + (Math.random().toFloat() * 200f)
         )
 
         val newUnitGaming = UnitGaming(

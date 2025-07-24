@@ -292,6 +292,7 @@ private fun getUnitRadius(unitType: UnitType): Float {
     }
 }
 
+// Обновленная панель спавна юнитов
 @Composable
 private fun UnitSpawnPanel(
     availableUnits: List<UnitType>,
@@ -301,25 +302,41 @@ private fun UnitSpawnPanel(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp),
+            .height(90.dp), // Увеличил высоту для подписей
         shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Black.copy(alpha = 0.8f)
         )
     ) {
-        LazyRow(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            items(availableUnits) { unitType ->
-                UnitSpawnButton(
-                    unitType = unitType,
-                    canSpawn = canSpawnUnit(unitType, gameState),
-                    onClick = { onSpawnUnitGaming(unitType) }
-                )
+            // Заголовок панели
+            Text(
+                text = "ВЫБЕРИТЕ ЮНИТ ДЛЯ СПАВНА",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(availableUnits) { unitType ->
+                    UnitSpawnButton(
+                        unitType = unitType,
+                        canSpawn = canSpawnUnit(unitType, gameState),
+                        onClick = { onSpawnUnitGaming(unitType) }
+                    )
+                }
             }
         }
     }
@@ -335,7 +352,8 @@ private fun UnitSpawnButton(
 
     Card(
         modifier = Modifier
-            .size(64.dp)
+            .width(80.dp) // Увеличил ширину для подписи
+            .height(64.dp)
             .clickable(enabled = canSpawn) { onClick() },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
@@ -349,15 +367,45 @@ private fun UnitSpawnButton(
         ) {
             Text(
                 text = getUnitIcon(unitType),
-                fontSize = 20.sp,
+                fontSize = 18.sp,
                 color = Color.White
             )
+
+            // Название юнита
+            Text(
+                text = getUnitShortName(unitType),
+                fontSize = 8.sp,
+                color = Color.White,
+                maxLines = 1,
+                fontWeight = FontWeight.Medium
+            )
+
+            // Стоимость
             Text(
                 text = "${unitStats.cost}",
                 fontSize = 10.sp,
-                color = Color.White
+                color = Color.Yellow,
+                fontWeight = FontWeight.Bold
             )
         }
+    }
+}
+
+// Добавляем функцию для коротких названий юнитов
+private fun getUnitShortName(unitType: UnitType): String {
+    return when (unitType) {
+        UnitType.HELICOPTER -> "Вертолет"
+        UnitType.AIRPLANE -> "Самолет"
+        UnitType.TANK -> "Танк"
+        UnitType.FORTIFY_VEHICLE -> "Укрепления"
+        UnitType.BTR -> "БТР"
+        UnitType.BMP -> "БМП"
+        UnitType.RIFLEMAN -> "Стрелок"
+        UnitType.MACHINE_GUNNER -> "Пулеметчик"
+        UnitType.ROCKET_SOLDIER -> "Ракетчик"
+        UnitType.MISSILE -> "Ракета"
+        UnitType.COMMAND_POST -> "КШМ"
+        UnitType.RADAR -> "РЛС"
     }
 }
 

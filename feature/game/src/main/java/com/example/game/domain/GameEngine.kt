@@ -62,10 +62,10 @@ class GameEngine {
         val selectedUnitType = availableUnits.random()
         val unitStats = GameConstants.UNIT_STATS[selectedUnitType] ?: return gameState
 
-        // Спавним рядом с КШМ противника
+        // Спавним рядом с КШМ противника с большей зоной разброса для большого поля
         val spawnPosition = Position(
-            x = GameConstants.ENEMY_COMMAND_POST_POSITION.x - 50f - (Random.nextFloat() * 100f),
-            y = GameConstants.ENEMY_COMMAND_POST_POSITION.y + 50f - (Random.nextFloat() * 100f)
+            x = GameConstants.ENEMY_COMMAND_POST_POSITION.x - 100f - (Random.nextFloat() * 200f),
+            y = GameConstants.ENEMY_COMMAND_POST_POSITION.y + 100f - (Random.nextFloat() * 200f)
         )
 
         val newUnitGaming = UnitGaming(

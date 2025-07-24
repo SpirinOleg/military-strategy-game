@@ -5,18 +5,18 @@ import com.example.common.model.UnitStats
 import com.example.common.model.UnitType
 
 object GameConstants {
-    // Игровые настройки
+    // Игровые настройки - УВЕЛИЧЕННОЕ ПОЛЕ
     const val INITIAL_POINTS = 1000
-    const val FIELD_WIDTH = 1200f
-    const val FIELD_HEIGHT = 800f
+    const val FIELD_WIDTH = 2000f  // Было 1200f, увеличил до 2000f
+    const val FIELD_HEIGHT = 1200f // Было 800f, увеличил до 1200f
 
-    // Позиции базовых строений
-    val PLAYER_COMMAND_POST_POSITION = Position(100f, FIELD_HEIGHT - 100f)
-    val PLAYER_RADAR_POSITION = Position(200f, FIELD_HEIGHT - 100f)
-    val ENEMY_COMMAND_POST_POSITION = Position(FIELD_WIDTH - 100f, 100f)
-    val ENEMY_RADAR_POSITION = Position(FIELD_WIDTH - 200f, 100f)
+    // Позиции базовых строений - обновленные под новые размеры
+    val PLAYER_COMMAND_POST_POSITION = Position(150f, FIELD_HEIGHT - 150f)
+    val PLAYER_RADAR_POSITION = Position(300f, FIELD_HEIGHT - 150f)
+    val ENEMY_COMMAND_POST_POSITION = Position(FIELD_WIDTH - 150f, 150f)
+    val ENEMY_RADAR_POSITION = Position(FIELD_WIDTH - 300f, 150f)
 
-    // Характеристики юнитов
+    // Характеристики юнитов (без изменений)
     val UNIT_STATS = mapOf(
         UnitType.HELICOPTER to UnitStats(
             type = UnitType.HELICOPTER,
@@ -140,12 +140,12 @@ object GameConstants {
         )
     )
 
-    // Настройки игры
+    // Настройки игры (без изменений)
     const val ATTACK_COOLDOWN = 1000L // мс между атаками
     const val AIRPLANE_LIFETIME = 5000L // время жизни самолета
     const val FORTIFICATION_BONUS_HEALTH = 100 // бонус здоровья от укреплений
 
-    // Настройки AI
+    // Настройки AI (без изменений)
     const val AI_SPAWN_PROBABILITY = 0.02f // вероятность спавна врага за тик
     const val AI_MIN_POINTS_TO_SPAWN = 100 // минимум очков для спавна
 }
