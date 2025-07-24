@@ -40,8 +40,11 @@ class GameViewModel(
 
     private var gameLoopJob: Job? = null
 
-    fun initializeGame(initialPoints: Int) {
-        val playerCommandPost = com.example.common.model.UnitGaming(
+    // ИСПРАВЛЕННАЯ функция инициализации с поддержкой покупок
+    fun initializeGame(initialPoints: Int, purchasedUnits: Map<UnitType, Int> = emptyMap()) {
+        println("DEBUG: Initializing game with points: $initialPoints, units: $purchasedUnits")
+
+        val playerCommandPost = UnitGaming(
             id = UUID.randomUUID().toString(),
             type = UnitType.COMMAND_POST,
             position = GameConstants.PLAYER_COMMAND_POST_POSITION,
@@ -64,6 +67,35 @@ class GameViewModel(
             speed = 0f,
             side = PlayerSide.BLUE
         )
+
+        // СОЗДАЕМ ЮНИТОВ ИЗ ПОКУПОК - ИСПРАВЛЕНИЕ ПРОБЛЕМЫ 1
+        val purchasedPlayerUnits = mutableListOf<UnitGaming>()
+        purchasedUnits.forEach { (unitType, quantity) ->
+            repeat(quantity) {
+                val unitStats = GameConstants.UNIT_STATS[unitType] ?: return@repeat
+
+                // Создаем позицию рядом с КШМ игрока
+                val spawnPosition = Position(
+                    x = GameConstants.PLAYER_COMMAND_POST_POSITION.x + 100f + (Math.random().toFloat() * 200f),
+                    y = GameConstants.PLAYER_COMMAND_POST_POSITION.y - 100f + (Math.random().toFloat() * 200f)
+                )
+
+                val newUnit = UnitGaming(
+                    id = UUID.randomUUID().toString(),
+                    type = unitType,
+                    position = spawnPosition,
+                    health = unitStats.health,
+                    maxHealth = unitStats.health,
+                    damage = unitStats.damage,
+                    range = unitStats.range,
+                    speed = unitStats.speed,
+                    side = PlayerSide.BLUE
+                )
+
+                purchasedPlayerUnits.add(newUnit)
+                println("DEBUG: Created purchased unit: ${unitType.name}")
+            }
+        }
 
         val enemyCommandPost = UnitGaming(
             id = UUID.randomUUID().toString(),
@@ -89,8 +121,16 @@ class GameViewModel(
             side = PlayerSide.RED
         )
 
+        // Объединяем базовые строения с купленными юнитами
+        val allPlayerUnits = listOf(playerCommandPost, playerRadar) + purchasedPlayerUnits
+
+        println("DEBUG: Total player units created: ${allPlayerUnits.size}")
+        allPlayerUnits.forEach { unit ->
+            println("DEBUG: Player unit: ${unit.type.name} at position (${unit.position.x}, ${unit.position.y})")
+        }
+
         val initialGameState = GameState(
-            playerUnitGamings = listOf(playerCommandPost, playerRadar),
+            playerUnitGamings = allPlayerUnits,
             enemyUnitGamings = listOf(enemyCommandPost, enemyRadar),
             playerPoints = initialPoints,
             enemyPoints = GameConstants.INITIAL_POINTS,
@@ -170,7 +210,7 @@ class GameViewModel(
         }
     }
 
-    private fun moveUnit(unitGaming: com.example.common.model.UnitGaming, targetPosition: Position) {
+    private fun moveUnit(unitGaming: UnitGaming, targetPosition: Position) {
         val currentState = _uiState.value.gameState
         val updatedUnits = currentState.playerUnitGamings.map { u ->
             if (u.id == unitGaming.id) {

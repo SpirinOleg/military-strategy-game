@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.common.constants.GameConstants
@@ -32,13 +33,15 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun GameScreen(
     initialPoints: Int,
+    purchasedUnits: Map<UnitType, Int> = emptyMap(), // Добавлен параметр для покупок
     onNavigateBack: () -> Unit,
     viewModel: GameViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(initialPoints) {
-        viewModel.initializeGame(initialPoints)
+    // Инициализируем игру с учетом покупок
+    LaunchedEffect(initialPoints, purchasedUnits) {
+        viewModel.initializeGame(initialPoints, purchasedUnits)
     }
 
     Column(
@@ -78,7 +81,7 @@ fun GameScreen(
             }
         }
 
-        // Нижняя панель с юнитами
+        // Нижняя панель с юнитами - ДОБАВЛЕНА СТОИМОСТЬ
         UnitSpawnPanel(
             availableUnits = uiState.availableUnits,
             gameState = uiState.gameState,
@@ -186,9 +189,6 @@ private fun drawGameField(
         gameState.enemyUnitGamings.forEach { unit ->
             drawUnit(unit, scaleX, scaleY, Color.Red)
         }
-
-        // Рисуем дальность атаки выбранного юнита
-        // TODO: Implement selection logic
     }
 }
 
@@ -292,7 +292,7 @@ private fun getUnitRadius(unitType: UnitType): Float {
     }
 }
 
-// Обновленная панель спавна юнитов
+// ИСПРАВЛЕННАЯ панель спавна юнитов С ОТОБРАЖЕНИЕМ СТОИМОСТИ
 @Composable
 private fun UnitSpawnPanel(
     availableUnits: List<UnitType>,
@@ -302,7 +302,7 @@ private fun UnitSpawnPanel(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(90.dp), // Увеличил высоту для подписей
+            .height(100.dp), // Увеличил высоту для стоимости
         shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Black.copy(alpha = 0.8f)
@@ -320,7 +320,7 @@ private fun UnitSpawnPanel(
                 color = Color.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
 
             LazyRow(
@@ -352,8 +352,8 @@ private fun UnitSpawnButton(
 
     Card(
         modifier = Modifier
-            .width(80.dp) // Увеличил ширину для подписи
-            .height(64.dp)
+            .width(90.dp) // Увеличил ширину для стоимости
+            .height(76.dp) // Увеличил высоту
             .clickable(enabled = canSpawn) { onClick() },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
@@ -367,25 +367,27 @@ private fun UnitSpawnButton(
         ) {
             Text(
                 text = getUnitIcon(unitType),
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 color = Color.White
             )
 
             // Название юнита
             Text(
                 text = getUnitShortName(unitType),
-                fontSize = 8.sp,
+                fontSize = 7.sp,
                 color = Color.White,
                 maxLines = 1,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center
             )
 
-            // Стоимость
+            // ДОБАВЛЕНА СТОИМОСТЬ - ИСПРАВЛЕНИЕ ПРОБЛЕМЫ 3
             Text(
-                text = "${unitStats.cost}",
-                fontSize = 10.sp,
+                text = "${unitStats.cost} очков",
+                fontSize = 8.sp,
                 color = Color.Yellow,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
             )
         }
     }

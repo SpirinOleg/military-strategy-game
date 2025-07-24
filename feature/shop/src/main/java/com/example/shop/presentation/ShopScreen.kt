@@ -3,9 +3,11 @@ package com.example.shop.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,7 +26,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun ShopScreen(
     onNavigateBack: () -> Unit,
-    onStartGame: (Int) -> Unit,
+    onStartGame: (Int, Map<UnitType, Int>) -> Unit, // Изменили сигнатуру
     viewModel: ShopViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -121,7 +123,7 @@ fun ShopScreen(
                 }
             }
 
-            // Боковая панель с информацией
+            // Боковая панель с информацией - ИСПРАВЛЕНА ПРОБЛЕМА СКРОЛЛИНГА
             Card(
                 modifier = Modifier
                     .weight(1f)
@@ -134,19 +136,24 @@ fun ShopScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(16.dp)
                 ) {
                     Text(
                         text = "АРМИЯ",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
 
-                    // Список купленных юнитов
-                    uiState.purchasedUnits.forEach { (unitType, quantity) ->
-                        if (quantity > 0) {
+                    // Список купленных юнитов с прокруткой
+                    LazyColumn(
+                        modifier = Modifier.weight(1f), // Занимает оставшееся место
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            uiState.purchasedUnits.filter { it.value > 0 }.entries.toList()
+                        ) { (unitType, quantity) ->
                             ArmyUnitItem(
                                 unitType = unitType,
                                 quantity = quantity
@@ -154,31 +161,36 @@ fun ShopScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // Кнопка начать игру
-                    Button(
-                        onClick = { onStartGame(uiState.points) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        enabled = uiState.purchasedUnits.values.sum() > 0,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50)
-                        )
+                    // Статистика и кнопка всегда внизу
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "НАЧАТЬ БОЙ",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            text = "Всего единиц: ${uiState.purchasedUnits.values.sum()}",
+                            color = Color.Gray,
+                            fontSize = 12.sp
                         )
-                    }
 
-                    Text(
-                        text = "Всего единиц: ${uiState.purchasedUnits.values.sum()}",
-                        color = Color.Gray,
-                        fontSize = 12.sp
-                    )
+                        // Кнопка начать игру
+                        Button(
+                            onClick = {
+                                onStartGame(uiState.points, uiState.purchasedUnits) // Передаем данные о покупках
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            enabled = uiState.purchasedUnits.values.sum() > 0,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF4CAF50)
+                            )
+                        ) {
+                            Text(
+                                text = "НАЧАТЬ БОЙ",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -275,21 +287,30 @@ private fun ArmyUnitItem(
     unitType: UnitType,
     quantity: Int
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+    Card(
+        shape = RoundedCornerShape(4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF3d3d3d)
+        )
     ) {
-        Text(
-            text = getUnitName(unitType),
-            color = Color.White,
-            fontSize = 12.sp
-        )
-        Text(
-            text = "x$quantity",
-            color = Color(0xFF4A90E2),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = getUnitName(unitType),
+                color = Color.White,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "x$quantity",
+                color = Color(0xFF4A90E2),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
