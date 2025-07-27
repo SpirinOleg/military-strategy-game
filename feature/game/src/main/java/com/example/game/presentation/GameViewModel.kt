@@ -268,7 +268,7 @@ class GameViewModel(
         }
     }
 
-    private suspend fun updateGame() {
+    private fun updateGame() {
         val currentState = _uiState.value.gameState
         val updatedState = gameEngine.updateGameState(currentState)
 

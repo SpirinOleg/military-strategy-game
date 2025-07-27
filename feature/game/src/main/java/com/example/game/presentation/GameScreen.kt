@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import com.example.common.constants.GameConstants
 import com.example.common.model.GameState
 import com.example.common.model.PlayerSide
-import com.example.common.model.Position
 import com.example.common.model.UnitType
 import com.example.common.model.UnitGaming
 import org.koin.androidx.compose.koinViewModel
@@ -52,7 +51,6 @@ fun GameScreen(
         GameTopBar(
             gameState = uiState.gameState,
             onNavigateBack = onNavigateBack,
-            onPause = { viewModel.pauseGame() }
         )
 
         // Увеличенное игровое поле
@@ -67,7 +65,6 @@ fun GameScreen(
         ) {
             GameField(
                 gameState = uiState.gameState,
-                onFieldClick = { position -> viewModel.onFieldClick(position) }
             )
 
             if (uiState.gameState.winner != null) {
@@ -93,7 +90,6 @@ fun GameScreen(
 private fun GameTopBar(
     gameState: GameState,
     onNavigateBack: () -> Unit,
-    onPause: () -> Unit
 ) {
     // Верхняя панель с кнопкой назад и отображением очков
     Row(
@@ -159,7 +155,6 @@ private fun GameTopBar(
 @Composable
 private fun GameField(
     gameState: GameState,
-    onFieldClick: (Position) -> Unit
 ) {
     Canvas(
         modifier = Modifier
