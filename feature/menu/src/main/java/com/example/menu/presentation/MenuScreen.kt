@@ -10,10 +10,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.system.exitProcess
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -21,6 +23,8 @@ fun MenuScreenCompact(
     onNavigateToShop: () -> Unit,
     onNavigateToGame: (Int) -> Unit
 ) {
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -93,39 +97,29 @@ fun MenuScreenCompact(
 
                         CompactMenuButton(
                             text = "🛒 МАГАЗИН ВОЙСК",
-                            color = Color(0xFFFF5722), // Ярко-красный для максимальной видимости
+                            color = Color(0xFFFF5722),
                             onClick = {
                                 println("DEBUG: ===== COMPACT SHOP BUTTON CLICKED =====")
                                 onNavigateToShop()
                             }
                         )
 
+                        // ИСПРАВЛЕНИЕ: Кнопка выход теперь работает
                         CompactMenuButton(
                             text = "❌ ВЫХОД",
                             color = Color(0xFF757575),
-                            onClick = { println("DEBUG: Exit clicked") }
+                            onClick = {
+                                println("DEBUG: Exit clicked - closing app")
+                                // Закрываем приложение
+                                (context as? androidx.activity.ComponentActivity)?.finish()
+                                exitProcess(0)
+                            }
                         )
                     }
                 }
             }
 
-            item {
-                // Отладочная информация
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF2E7D32).copy(alpha = 0.8f)
-                    )
-                ) {
-                    Text(
-                        text = "✅ COMPACT MENU LOADED\n🛒 SHOP BUTTON SHOULD BE VISIBLE",
-                        modifier = Modifier.padding(8.dp),
-                        fontSize = 10.sp,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+            // ИСПРАВЛЕНИЕ: Убираем ненужную отладочную информацию внизу
         }
     }
 }

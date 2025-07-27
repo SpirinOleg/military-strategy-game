@@ -33,13 +33,12 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun GameScreen(
     initialPoints: Int,
-    purchasedUnits: Map<UnitType, Int> = emptyMap(), // Добавлен параметр для покупок
+    purchasedUnits: Map<UnitType, Int> = emptyMap(),
     onNavigateBack: () -> Unit,
     viewModel: GameViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Инициализируем игру с учетом покупок
     LaunchedEffect(initialPoints, purchasedUnits) {
         viewModel.initializeGame(initialPoints, purchasedUnits)
     }
@@ -49,19 +48,19 @@ fun GameScreen(
             .fillMaxSize()
             .background(Color(0xFF0f3460))
     ) {
-        // Верхняя панель игры
+        // ИСПРАВЛЕНИЕ: Уменьшенная верхняя панель без названия "ПОЛЕ БОЯ"
         GameTopBar(
             gameState = uiState.gameState,
             onNavigateBack = onNavigateBack,
             onPause = { viewModel.pauseGame() }
         )
 
-        // Основное игровое поле
+        // ИСПРАВЛЕНИЕ: Увеличенное игровое поле (больший weight)
         Box(
             modifier = Modifier
-                .weight(1f)
+                .weight(1f) // Увеличили вес игрового поля
                 .fillMaxWidth()
-                .padding(8.dp)
+                .padding(4.dp) // Уменьшили отступы
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF2d4a22))
                 .border(2.dp, Color(0xFF4A90E2), RoundedCornerShape(8.dp))
@@ -71,7 +70,6 @@ fun GameScreen(
                 onFieldClick = { position -> viewModel.onFieldClick(position) }
             )
 
-            // Оверлей победы/поражения
             if (uiState.gameState.winner != null) {
                 GameEndOverlay(
                     winner = uiState.gameState.winner!!,
@@ -81,7 +79,7 @@ fun GameScreen(
             }
         }
 
-        // Нижняя панель с юнитами - ДОБАВЛЕНА СТОИМОСТЬ
+        // ИСПРАВЛЕНИЕ: Уменьшенная нижняя панель с очками
         UnitSpawnPanel(
             availableUnits = uiState.availableUnits,
             gameState = uiState.gameState,
@@ -97,59 +95,62 @@ private fun GameTopBar(
     onNavigateBack: () -> Unit,
     onPause: () -> Unit
 ) {
-    TopAppBar(
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "ПОЛЕ БОЯ",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+    // ИСПРАВЛЕНИЕ: Компактная верхняя панель с маленькой кнопкой назад
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp) // Уменьшили высоту
+            .background(Color.Transparent)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Маленькая кнопка назад
+        TextButton(
+            onClick = onNavigateBack,
+            modifier = Modifier.size(width = 60.dp, height = 32.dp) // Маленький размер
+        ) {
+            Text(
+                "← МЕНЮ",
+                color = Color.White,
+                fontSize = 10.sp // Маленький шрифт
+            )
+        }
 
-                // Статус управления
-                if (!gameState.playerCanControl) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color.Red
-                        )
-                    ) {
-                        Text(
-                            text = "РЛС УНИЧТОЖЕНА!",
-                            modifier = Modifier.padding(8.dp),
-                            color = Color.White,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-        },
-        navigationIcon = {
-            TextButton(onClick = onNavigateBack) {
-                Text("← МЕНЮ", color = Color.White)
-            }
-        },
-        actions = {
+        // Статус управления (центр)
+        if (!gameState.playerCanControl) {
             Card(
-                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF4A90E2)
-                )
+                    containerColor = Color.Red
+                ),
+                modifier = Modifier.height(28.dp)
             ) {
                 Text(
-                    text = "Очки: ${gameState.playerPoints}",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    text = "РЛС УНИЧТОЖЕНА!",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     color = Color.White,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 10.sp
                 )
             }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent
-        )
-    )
+        }
+
+        // Очки (справа)
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF4A90E2)
+            ),
+            modifier = Modifier.height(28.dp)
+        ) {
+            Text(
+                text = "Очки: ${gameState.playerPoints}",
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+        }
+    }
 }
 
 @Composable
@@ -177,15 +178,12 @@ private fun drawGameField(
         val scaleX = size.width / GameConstants.FIELD_WIDTH
         val scaleY = size.height / GameConstants.FIELD_HEIGHT
 
-        // Рисуем сетку поля
         drawGrid(scaleX, scaleY)
 
-        // Рисуем юнитов игрока (синие)
         gameState.playerUnitGamings.forEach { unit ->
             drawUnit(unit, scaleX, scaleY, Color.Blue)
         }
 
-        // Рисуем юнитов противника (красные)
         gameState.enemyUnitGamings.forEach { unit ->
             drawUnit(unit, scaleX, scaleY, Color.Red)
         }
@@ -196,7 +194,6 @@ private fun DrawScope.drawGrid(scaleX: Float, scaleY: Float) {
     val gridSpacing = 100f
     val gridColor = Color.Gray.copy(alpha = 0.3f)
 
-    // Вертикальные линии
     var x = gridSpacing
     while (x < GameConstants.FIELD_WIDTH) {
         drawLine(
@@ -208,7 +205,6 @@ private fun DrawScope.drawGrid(scaleX: Float, scaleY: Float) {
         x += gridSpacing
     }
 
-    // Горизонтальные линии
     var y = gridSpacing
     while (y < GameConstants.FIELD_HEIGHT) {
         drawLine(
@@ -231,14 +227,12 @@ private fun DrawScope.drawUnit(
     val y = unitGaming.position.y * scaleY
     val radius = getUnitRadius(unitGaming.type)
 
-    // Основная фигура юнита
     drawCircle(
         color = color,
         radius = radius * scaleX,
         center = Offset(x, y)
     )
 
-    // Обводка
     drawCircle(
         color = Color.White,
         radius = radius * scaleX,
@@ -246,10 +240,8 @@ private fun DrawScope.drawUnit(
         style = Stroke(width = 2.dp.toPx())
     )
 
-    // Полоска здоровья
     drawHealthBar(unitGaming, x, y, radius * scaleX)
 
-    // Дальность атаки (для выбранных юнитов)
     if (unitGaming.range > 0) {
         drawCircle(
             color = color.copy(alpha = 0.1f),
@@ -265,14 +257,12 @@ private fun DrawScope.drawHealthBar(unitGaming: UnitGaming, x: Float, y: Float, 
     val barHeight = 4.dp.toPx()
     val healthPercent = unitGaming.health.toFloat() / unitGaming.maxHealth.toFloat()
 
-    // Фон полоски здоровья
     drawRect(
         color = Color.Red,
         topLeft = Offset(x - barWidth / 2, y - radius - barHeight - 4.dp.toPx()),
         size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
     )
 
-    // Текущее здоровье
     drawRect(
         color = Color.Green,
         topLeft = Offset(x - barWidth / 2, y - radius - barHeight - 4.dp.toPx()),
@@ -292,7 +282,7 @@ private fun getUnitRadius(unitType: UnitType): Float {
     }
 }
 
-// ИСПРАВЛЕННАЯ панель спавна юнитов С ОТОБРАЖЕНИЕМ СТОИМОСТИ
+// ИСПРАВЛЕНИЕ: Уменьшенная панель спавна с отображением очков
 @Composable
 private fun UnitSpawnPanel(
     availableUnits: List<UnitType>,
@@ -302,7 +292,7 @@ private fun UnitSpawnPanel(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.dp), // Увеличил высоту для стоимости
+            .height(70.dp), // ИСПРАВЛЕНИЕ: Уменьшили высоту с 100dp до 70dp
         shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Black.copy(alpha = 0.8f)
@@ -311,23 +301,35 @@ private fun UnitSpawnPanel(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Заголовок панели
-            Text(
-                text = "ВЫБЕРИТЕ ЮНИТ ДЛЯ СПАВНА",
+            // ИСПРАВЛЕНИЕ: Убрали заголовок, добавили отображение очков
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ЮНИТЫ",
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // ИСПРАВЛЕНИЕ: Дублируем очки внизу для видимости
+                Text(
+                    text = "Очки: ${gameState.playerPoints}",
+                    color = Color(0xFF4A90E2),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
             LazyRow(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items(availableUnits) { unitType ->
@@ -352,10 +354,10 @@ private fun UnitSpawnButton(
 
     Card(
         modifier = Modifier
-            .width(90.dp) // Увеличил ширину для стоимости
-            .height(76.dp) // Увеличил высоту
+            .width(70.dp) // ИСПРАВЛЕНИЕ: Уменьшили ширину
+            .height(50.dp) // ИСПРАВЛЕНИЕ: Уменьшили высоту
             .clickable(enabled = canSpawn) { onClick() },
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(6.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (canSpawn) Color(0xFF4A90E2) else Color.Gray
         )
@@ -367,24 +369,22 @@ private fun UnitSpawnButton(
         ) {
             Text(
                 text = getUnitIcon(unitType),
-                fontSize = 16.sp,
+                fontSize = 12.sp, // Уменьшили размер иконки
                 color = Color.White
             )
 
-            // Название юнита
             Text(
                 text = getUnitShortName(unitType),
-                fontSize = 7.sp,
+                fontSize = 6.sp, // Уменьшили размер названия
                 color = Color.White,
                 maxLines = 1,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
             )
 
-            // ДОБАВЛЕНА СТОИМОСТЬ - ИСПРАВЛЕНИЕ ПРОБЛЕМЫ 3
             Text(
-                text = "${unitStats.cost} очков",
-                fontSize = 8.sp,
+                text = "${unitStats.cost}",
+                fontSize = 7.sp, // Упростили отображение стоимости
                 color = Color.Yellow,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
@@ -393,7 +393,6 @@ private fun UnitSpawnButton(
     }
 }
 
-// Добавляем функцию для коротких названий юнитов
 private fun getUnitShortName(unitType: UnitType): String {
     return when (unitType) {
         UnitType.HELICOPTER -> "Вертолет"
