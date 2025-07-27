@@ -51,7 +51,8 @@ class GameEngine {
             UnitType.BMP,
             UnitType.RIFLEMAN,
             UnitType.MACHINE_GUNNER,
-            UnitType.ROCKET_SOLDIER
+            UnitType.ROCKET_SOLDIER,
+            UnitType.AIR_DEFENSE // НОВОЕ: AI тоже может создавать зенитки
         ).filter {
             val cost = GameConstants.UNIT_STATS[it]?.cost ?: Int.MAX_VALUE
             gameState.enemyPoints >= cost
@@ -104,7 +105,38 @@ class GameEngine {
     private fun moveUnitTowardsTarget(unitGaming: UnitGaming, gameState: GameState): UnitGaming {
         if (unitGaming.speed == 0f || !unitGaming.isAlive) return unitGaming
 
-        // Находим ближайшего врага
+        // НОВОЕ: Зенитная установка неподвижна, но может атаковать
+        if (unitGaming.type == UnitType.AIR_DEFENSE) {
+            // Ищем приоритетные воздушные цели (ракеты и самолеты)
+            val enemies = if (unitGaming.side == PlayerSide.BLUE) gameState.enemyUnitGamings else gameState.playerUnitGamings
+            val airTargets = enemies.filter {
+                it.isAlive && (it.type == UnitType.MISSILE || it.type == UnitType.AIRPLANE)
+            }
+
+            val nearestAirTarget = airTargets.minByOrNull {
+                calculateDistance(unitGaming.position, it.position)
+            }
+
+            if (nearestAirTarget != null) {
+                val distanceToTarget = calculateDistance(unitGaming.position, nearestAirTarget.position)
+                if (distanceToTarget <= unitGaming.range) {
+                    return unitGaming.copy(target = nearestAirTarget.id)
+                }
+            }
+
+            // Если нет воздушных целей, атакуем ближайшего врага
+            val nearestEnemy = findNearestEnemy(unitGaming, enemies)
+            if (nearestEnemy != null) {
+                val distanceToEnemy = calculateDistance(unitGaming.position, nearestEnemy.position)
+                if (distanceToEnemy <= unitGaming.range) {
+                    return unitGaming.copy(target = nearestEnemy.id)
+                }
+            }
+
+            return unitGaming
+        }
+
+        // Находим ближайшего врага для обычных юнитов
         val enemies = if (unitGaming.side == PlayerSide.BLUE) gameState.enemyUnitGamings else gameState.playerUnitGamings
         val nearestEnemy = findNearestEnemy(unitGaming, enemies) ?: return unitGaming
 
@@ -148,7 +180,15 @@ class GameEngine {
                         updatedEnemyUnits[targetIndex] = updatedTarget
                     }
 
-                    updatedPlayerUnits[index] = unit.copy(lastAttackTime = currentTime)
+                    // ДОРАБОТКА 3: Ракета уничтожается сразу после атаки
+                    if (unit.type == UnitType.MISSILE) {
+                        updatedPlayerUnits[index] = unit.copy(
+                            lastAttackTime = currentTime,
+                            isAlive = false // Ракета уничтожается после попадания
+                        )
+                    } else {
+                        updatedPlayerUnits[index] = unit.copy(lastAttackTime = currentTime)
+                    }
                 }
             }
         }
@@ -168,7 +208,15 @@ class GameEngine {
                         updatedPlayerUnits[targetIndex] = updatedTarget
                     }
 
-                    updatedEnemyUnits[index] = unit.copy(lastAttackTime = currentTime)
+                    // ДОРАБОТКА 3: Ракета противника тоже уничтожается после атаки
+                    if (unit.type == UnitType.MISSILE) {
+                        updatedEnemyUnits[index] = unit.copy(
+                            lastAttackTime = currentTime,
+                            isAlive = false // Ракета уничтожается после попадания
+                        )
+                    } else {
+                        updatedEnemyUnits[index] = unit.copy(lastAttackTime = currentTime)
+                    }
                 }
             }
         }
@@ -273,6 +321,12 @@ class GameEngine {
         val distance = calculateDistance(attacker.position, target.position)
         val canReachTarget = distance <= attacker.range
         val cooldownPassed = currentTime - attacker.lastAttackTime >= GameConstants.ATTACK_COOLDOWN
+
+        // НОВАЯ ЛОГИКА: Ракеты могут быть сбиты только зенитками или самолетами
+        if (target.type == UnitType.MISSILE) {
+            val canInterceptMissile = attacker.type == UnitType.AIR_DEFENSE || attacker.type == UnitType.AIRPLANE
+            return canReachTarget && cooldownPassed && target.isAlive && canInterceptMissile
+        }
 
         return canReachTarget && cooldownPassed && target.isAlive
     }

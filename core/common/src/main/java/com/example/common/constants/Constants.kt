@@ -16,7 +16,10 @@ object GameConstants {
     val ENEMY_COMMAND_POST_POSITION = Position(FIELD_WIDTH - 150f, 150f)
     val ENEMY_RADAR_POSITION = Position(FIELD_WIDTH - 300f, 150f)
 
-    // Характеристики юнитов (без изменений)
+    // НОВОЕ: Ограничения на юниты
+    const val MAX_MISSILES_PER_PLAYER = 3 // Максимум 3 ракеты на игрока
+
+    // Характеристики юнитов
     val UNIT_STATS = mapOf(
         UnitType.HELICOPTER to UnitStats(
             type = UnitType.HELICOPTER,
@@ -108,15 +111,16 @@ object GameConstants {
             killReward = 40,
             description = "Солдат с противотанковой ракетой"
         ),
+        // ИЗМЕНЕНО: Ракета теперь стоит 300 очков вместо 60
         UnitType.MISSILE to UnitStats(
             type = UnitType.MISSILE,
-            cost = 60,
+            cost = 300, // Увеличили стоимость с 60 до 300
             health = 30,
             damage = 80,
             range = 300f,
             speed = 4f,
             killReward = 30,
-            description = "Управляемая ракета"
+            description = "Управляемая ракета (макс. 3 шт.)"
         ),
         UnitType.COMMAND_POST to UnitStats(
             type = UnitType.COMMAND_POST,
@@ -137,6 +141,17 @@ object GameConstants {
             speed = 0f,
             killReward = 0,
             description = "РЛС для управления войсками"
+        ),
+        // НОВЫЙ ЮНИТ: Зенитная установка для перехвата ракет
+        UnitType.AIR_DEFENSE to UnitStats(
+            type = UnitType.AIR_DEFENSE,
+            cost = 120,
+            health = 80,
+            damage = 60,
+            range = 250f,
+            speed = 0f, // Неподвижная установка
+            killReward = 60,
+            description = "Зенитная установка для перехвата ракет и самолетов"
         )
     )
 

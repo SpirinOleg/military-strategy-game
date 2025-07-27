@@ -139,6 +139,7 @@ class GameViewModel(
             enemyCanControl = true
         )
 
+        // ИСПРАВЛЕНИЕ: Добавили зенитную установку в список доступных юнитов
         val availableUnits = listOf(
             UnitType.HELICOPTER,
             UnitType.AIRPLANE,
@@ -149,7 +150,8 @@ class GameViewModel(
             UnitType.RIFLEMAN,
             UnitType.MACHINE_GUNNER,
             UnitType.ROCKET_SOLDIER,
-            UnitType.MISSILE
+            UnitType.MISSILE,
+            UnitType.AIR_DEFENSE // НОВЫЙ: Зенитная установка
         )
 
         _uiState.value = _uiState.value.copy(
@@ -166,6 +168,14 @@ class GameViewModel(
 
         val unitStats = GameConstants.UNIT_STATS[unitType] ?: return
         if (currentState.playerPoints < unitStats.cost) return
+
+        // Проверка ограничения на ракеты
+        if (unitType == UnitType.MISSILE) {
+            val currentMissileCount = currentState.playerUnitGamings.count {
+                it.type == UnitType.MISSILE && it.isAlive
+            }
+            if (currentMissileCount >= GameConstants.MAX_MISSILES_PER_PLAYER) return
+        }
 
         // Создаем новый юнит рядом с КШМ игрока с большей зоной разброса для увеличенного поля
         val spawnPosition = Position(

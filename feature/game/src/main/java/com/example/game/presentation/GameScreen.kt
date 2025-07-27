@@ -48,19 +48,19 @@ fun GameScreen(
             .fillMaxSize()
             .background(Color(0xFF0f3460))
     ) {
-        // ИСПРАВЛЕНИЕ: Уменьшенная верхняя панель без названия "ПОЛЕ БОЯ"
+        // ИСПРАВЛЕНИЕ: Верхняя панель с кнопкой назад и отображением очков
         GameTopBar(
             gameState = uiState.gameState,
             onNavigateBack = onNavigateBack,
             onPause = { viewModel.pauseGame() }
         )
 
-        // ИСПРАВЛЕНИЕ: Увеличенное игровое поле (больший weight)
+        // Увеличенное игровое поле
         Box(
             modifier = Modifier
-                .weight(1f) // Увеличили вес игрового поля
+                .weight(1f)
                 .fillMaxWidth()
-                .padding(4.dp) // Уменьшили отступы
+                .padding(4.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF2d4a22))
                 .border(2.dp, Color(0xFF4A90E2), RoundedCornerShape(8.dp))
@@ -79,7 +79,7 @@ fun GameScreen(
             }
         }
 
-        // ИСПРАВЛЕНИЕ: Уменьшенная нижняя панель с очками
+        // ДОРАБОТКА 1 и 2: Обновленная нижняя панель
         UnitSpawnPanel(
             availableUnits = uiState.availableUnits,
             gameState = uiState.gameState,
@@ -95,11 +95,11 @@ private fun GameTopBar(
     onNavigateBack: () -> Unit,
     onPause: () -> Unit
 ) {
-    // ИСПРАВЛЕНИЕ: Компактная верхняя панель с маленькой кнопкой назад
+    // Верхняя панель с кнопкой назад и отображением очков
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp) // Уменьшили высоту
+            .height(40.dp)
             .background(Color.Transparent)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -108,12 +108,12 @@ private fun GameTopBar(
         // Маленькая кнопка назад
         TextButton(
             onClick = onNavigateBack,
-            modifier = Modifier.size(width = 60.dp, height = 32.dp) // Маленький размер
+            modifier = Modifier.size(width = 60.dp, height = 32.dp)
         ) {
             Text(
                 "← МЕНЮ",
                 color = Color.White,
-                fontSize = 10.sp // Маленький шрифт
+                fontSize = 10.sp
             )
         }
 
@@ -132,9 +132,12 @@ private fun GameTopBar(
                     fontSize = 10.sp
                 )
             }
+        } else {
+            // Пустое место для симметрии
+            Spacer(modifier = Modifier.width(60.dp))
         }
 
-        // Очки (справа)
+        // ИСПРАВЛЕНИЕ: Вернули отображение очков справа
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
@@ -277,12 +280,13 @@ private fun getUnitRadius(unitType: UnitType): Float {
         UnitType.FORTIFY_VEHICLE -> 22f
         UnitType.RIFLEMAN, UnitType.MACHINE_GUNNER, UnitType.ROCKET_SOLDIER -> 15f
         UnitType.MISSILE -> 12f
+        UnitType.AIR_DEFENSE -> 28f // НОВЫЙ: Зенитка чуть больше танка
         UnitType.COMMAND_POST -> 35f
         UnitType.RADAR -> 30f
     }
 }
 
-// ИСПРАВЛЕНИЕ: Уменьшенная панель спавна с отображением очков
+// ДОРАБОТКА 1 и 2: Обновленная панель спавна
 @Composable
 private fun UnitSpawnPanel(
     availableUnits: List<UnitType>,
@@ -292,53 +296,25 @@ private fun UnitSpawnPanel(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(70.dp), // ИСПРАВЛЕНИЕ: Уменьшили высоту с 100dp до 70dp
+            .height(64.dp), // Уменьшили высоту панели с 70dp до 64dp
         shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Black.copy(alpha = 0.8f)
         )
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+        LazyRow(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 6.dp, vertical = 4.dp), // Уменьшили вертикальные отступы
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // ИСПРАВЛЕНИЕ: Убрали заголовок, добавили отображение очков
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "ЮНИТЫ",
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
+            items(availableUnits) { unitType ->
+                UnitSpawnButton(
+                    unitType = unitType,
+                    canSpawn = canSpawnUnit(unitType, gameState),
+                    onClick = { onSpawnUnitGaming(unitType) }
                 )
-
-                // ИСПРАВЛЕНИЕ: Дублируем очки внизу для видимости
-                Text(
-                    text = "Очки: ${gameState.playerPoints}",
-                    color = Color(0xFF4A90E2),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                items(availableUnits) { unitType ->
-                    UnitSpawnButton(
-                        unitType = unitType,
-                        canSpawn = canSpawnUnit(unitType, gameState),
-                        onClick = { onSpawnUnitGaming(unitType) }
-                    )
-                }
             }
         }
     }
@@ -354,8 +330,8 @@ private fun UnitSpawnButton(
 
     Card(
         modifier = Modifier
-            .width(70.dp) // ИСПРАВЛЕНИЕ: Уменьшили ширину
-            .height(50.dp) // ИСПРАВЛЕНИЕ: Уменьшили высоту
+            .width(65.dp)
+            .height(50.dp)
             .clickable(enabled = canSpawn) { onClick() },
         shape = RoundedCornerShape(6.dp),
         colors = CardDefaults.cardColors(
@@ -365,30 +341,49 @@ private fun UnitSpawnButton(
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy((-2).dp)
         ) {
             Text(
                 text = getUnitIcon(unitType),
-                fontSize = 12.sp, // Уменьшили размер иконки
+                fontSize = 14.sp,
                 color = Color.White
             )
 
-            Text(
-                text = getUnitShortName(unitType),
-                fontSize = 6.sp, // Уменьшили размер названия
-                color = Color.White,
-                maxLines = 1,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                Text(
+                    text = getUnitShortName(unitType),
+                    fontSize = 7.sp,
+                    color = Color.White,
+                    maxLines = 1,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 8.sp
+                )
 
-            Text(
-                text = "${unitStats.cost}",
-                fontSize = 7.sp, // Упростили отображение стоимости
-                color = Color.Yellow,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
+                // НОВОЕ: Специальное отображение для ракет
+                if (unitType == UnitType.MISSILE) {
+                    Text(
+                        text = "${unitStats.cost} оч",
+                        fontSize = 7.sp, // Уменьшили размер для ракет
+                        color = Color.Red, // Красный цвет для дорогих ракет
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 8.sp
+                    )
+                } else {
+                    Text(
+                        text = "${unitStats.cost} оч",
+                        fontSize = 8.sp,
+                        color = Color.Yellow,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 9.sp
+                    )
+                }
+            }
         }
     }
 }
@@ -405,6 +400,7 @@ private fun getUnitShortName(unitType: UnitType): String {
         UnitType.MACHINE_GUNNER -> "Пулеметчик"
         UnitType.ROCKET_SOLDIER -> "Ракетчик"
         UnitType.MISSILE -> "Ракета"
+        UnitType.AIR_DEFENSE -> "Зенитка" // НОВЫЙ: Короткое название
         UnitType.COMMAND_POST -> "КШМ"
         UnitType.RADAR -> "РЛС"
     }
@@ -412,9 +408,23 @@ private fun getUnitShortName(unitType: UnitType): String {
 
 private fun canSpawnUnit(unitType: UnitType, gameState: GameState): Boolean {
     val unitStats = GameConstants.UNIT_STATS[unitType] ?: return false
-    return gameState.playerPoints >= unitStats.cost &&
-            gameState.isGameActive &&
-            gameState.playerCanControl
+
+    // Базовые проверки
+    val hasEnoughPoints = gameState.playerPoints >= unitStats.cost
+    val gameIsActive = gameState.isGameActive
+    val canControl = gameState.playerCanControl
+
+    // НОВОЕ: Специальная проверка для ракет - ограничение количества
+    if (unitType == UnitType.MISSILE) {
+        val currentMissileCount = gameState.playerUnitGamings.count {
+            it.type == UnitType.MISSILE && it.isAlive
+        }
+        val missileLimit = currentMissileCount < GameConstants.MAX_MISSILES_PER_PLAYER
+
+        return hasEnoughPoints && gameIsActive && canControl && missileLimit
+    }
+
+    return hasEnoughPoints && gameIsActive && canControl
 }
 
 private fun getUnitIcon(unitType: UnitType): String {
@@ -429,6 +439,7 @@ private fun getUnitIcon(unitType: UnitType): String {
         UnitType.MACHINE_GUNNER -> "⚡"
         UnitType.ROCKET_SOLDIER -> "🚀"
         UnitType.MISSILE -> "💥"
+        UnitType.AIR_DEFENSE -> "🎯" // НОВЫЙ: Значок мишени для зенитки
         UnitType.COMMAND_POST -> "🏢"
         UnitType.RADAR -> "📡"
     }

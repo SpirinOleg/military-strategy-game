@@ -328,5 +328,6 @@ private fun getUnitName(unitType: UnitType): String {
         UnitType.MISSILE -> "Ракета"
         UnitType.COMMAND_POST -> "КШМ"
         UnitType.RADAR -> "РЛС"
+        UnitType.AIR_DEFENSE -> "Зенитная установка"
     }
 }

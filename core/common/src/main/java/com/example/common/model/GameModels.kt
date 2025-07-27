@@ -23,6 +23,7 @@ enum class UnitType {
     MACHINE_GUNNER, // Пулеметчик
     ROCKET_SOLDIER, // Ракетчик
     MISSILE,        // Ракета
+    AIR_DEFENSE,    // НОВЫЙ: Зенитная установка
     COMMAND_POST,   // КШМ
     RADAR          // РЛС
 }
