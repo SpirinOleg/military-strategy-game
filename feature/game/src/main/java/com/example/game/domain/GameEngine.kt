@@ -63,11 +63,16 @@ class GameEngine {
         val selectedUnitType = availableUnits.random()
         val unitStats = GameConstants.UNIT_STATS[selectedUnitType] ?: return gameState
 
-        // Спавним рядом с КШМ противника с большей зоной разброса для большого поля
-        val spawnPosition = Position(
-            x = GameConstants.ENEMY_COMMAND_POST_POSITION.x - 100f - (Random.nextFloat() * 200f),
-            y = GameConstants.ENEMY_COMMAND_POST_POSITION.y + 100f - (Random.nextFloat() * 200f)
-        )
+        // ОБНОВЛЕННАЯ ЛОГИКА: Специальное размещение для зенитки противника
+        val spawnPosition = if (selectedUnitType == UnitType.AIR_DEFENSE) {
+            findEnemyAirDefensePosition(gameState.enemyUnitGamings)
+        } else {
+            // Обычная логика для других юнитов
+            Position(
+                x = GameConstants.ENEMY_COMMAND_POST_POSITION.x - 100f - (Random.nextFloat() * 200f),
+                y = GameConstants.ENEMY_COMMAND_POST_POSITION.y + 100f - (Random.nextFloat() * 200f)
+            )
+        }
 
         val newUnitGaming = UnitGaming(
             id = generateId(),
@@ -85,6 +90,68 @@ class GameEngine {
             enemyUnitGamings = gameState.enemyUnitGamings + newUnitGaming,
             enemyPoints = gameState.enemyPoints - unitStats.cost
         )
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Поиск подходящей позиции для зенитки противника
+    private fun findEnemyAirDefensePosition(existingUnits: List<UnitGaming>): Position {
+        val commandPostPos = GameConstants.ENEMY_COMMAND_POST_POSITION
+        val radarPos = GameConstants.ENEMY_RADAR_POSITION
+
+        // Пробуем разместить зенитку в нескольких позициях вокруг КШМ и РЛС противника
+        val candidatePositions = listOf(
+            // Вокруг КШМ противника
+            Position(commandPostPos.x + 80f, commandPostPos.y - 80f),
+            Position(commandPostPos.x - 80f, commandPostPos.y - 80f),
+            Position(commandPostPos.x + 80f, commandPostPos.y + 80f),
+            Position(commandPostPos.x - 80f, commandPostPos.y + 80f),
+            // Вокруг РЛС противника
+            Position(radarPos.x + 80f, radarPos.y - 80f),
+            Position(radarPos.x - 80f, radarPos.y - 80f),
+            Position(radarPos.x + 80f, radarPos.y + 80f),
+            Position(radarPos.x - 80f, radarPos.y + 80f),
+            // Между КШМ и РЛС противника
+            Position((commandPostPos.x + radarPos.x) / 2f, (commandPostPos.y + radarPos.y) / 2f - 60f),
+            Position((commandPostPos.x + radarPos.x) / 2f, (commandPostPos.y + radarPos.y) / 2f + 60f)
+        )
+
+        // Выбираем первую свободную позицию
+        for (position in candidatePositions) {
+            if (isPositionFree(position, existingUnits)) {
+                return position
+            }
+        }
+
+        // Если все позиции заняты, ищем случайную рядом с КШМ противника
+        var attempts = 0
+        while (attempts < 20) {
+            val angle = Random.nextDouble() * 2 * PI
+            val distance = 60f + Random.nextFloat() * 40f // От 60 до 100 пикселей от КШМ
+            val position = Position(
+                x = (commandPostPos.x + cos(angle) * distance).toFloat(),
+                y = (commandPostPos.y + sin(angle) * distance).toFloat()
+            )
+
+            if (isPositionFree(position, existingUnits) &&
+                position.x >= 0f && position.x <= GameConstants.FIELD_WIDTH &&
+                position.y >= 0f && position.y <= GameConstants.FIELD_HEIGHT) {
+                return position
+            }
+            attempts++
+        }
+
+        // В крайнем случае возвращаем позицию рядом с КШМ противника
+        return Position(commandPostPos.x - 60f, commandPostPos.y + 60f)
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Проверка свободности позиции
+    private fun isPositionFree(position: Position, existingUnits: List<UnitGaming>): Boolean {
+        val minDistance = 50f // Минимальное расстояние между юнитами
+        return existingUnits.none { unit ->
+            val dx = unit.position.x - position.x
+            val dy = unit.position.y - position.y
+            val distance = sqrt(dx * dx + dy * dy)
+            distance < minDistance
+        }
     }
 
     private fun updateUnitMovement(gameState: GameState): GameState {

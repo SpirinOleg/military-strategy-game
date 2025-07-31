@@ -225,18 +225,23 @@ private fun DrawScope.drawUnit(
     val y = unitGaming.position.y * scaleY
     val radius = getUnitRadius(unitGaming.type)
 
-    drawCircle(
-        color = color,
-        radius = radius * scaleX,
-        center = Offset(x, y)
-    )
+    // НОВОЕ: Специальное отображение для зенитки в виде пирамиды из квадратиков
+    if (unitGaming.type == UnitType.AIR_DEFENSE) {
+        drawAirDefenseUnit(x, y, color, scaleX)
+    } else {
+        drawCircle(
+            color = color,
+            radius = radius * scaleX,
+            center = Offset(x, y)
+        )
 
-    drawCircle(
-        color = Color.White,
-        radius = radius * scaleX,
-        center = Offset(x, y),
-        style = Stroke(width = 2.dp.toPx())
-    )
+        drawCircle(
+            color = Color.White,
+            radius = radius * scaleX,
+            center = Offset(x, y),
+            style = Stroke(width = 2.dp.toPx())
+        )
+    }
 
     drawHealthBar(unitGaming, x, y, radius * scaleX)
 
@@ -248,6 +253,51 @@ private fun DrawScope.drawUnit(
             style = Stroke(width = 1.dp.toPx())
         )
     }
+}
+
+// НОВАЯ ФУНКЦИЯ: Отрисовка зенитки в виде пирамиды из квадратиков
+private fun DrawScope.drawAirDefenseUnit(x: Float, y: Float, color: Color, scale: Float) {
+    val squareSize = 8f * scale
+    val spacing = 2f * scale
+
+    // Нижний ряд - 2 квадратика
+    drawRect(
+        color = color,
+        topLeft = Offset(x - squareSize - spacing/2, y + spacing),
+        size = androidx.compose.ui.geometry.Size(squareSize, squareSize)
+    )
+    drawRect(
+        color = color,
+        topLeft = Offset(x + spacing/2, y + spacing),
+        size = androidx.compose.ui.geometry.Size(squareSize, squareSize)
+    )
+
+    // Верхний квадратик - вершина пирамиды
+    drawRect(
+        color = color,
+        topLeft = Offset(x - squareSize/2, y - squareSize - spacing),
+        size = androidx.compose.ui.geometry.Size(squareSize, squareSize)
+    )
+
+    // Белые обводки для квадратиков
+    drawRect(
+        color = Color.White,
+        topLeft = Offset(x - squareSize - spacing/2, y + spacing),
+        size = androidx.compose.ui.geometry.Size(squareSize, squareSize),
+        style = Stroke(width = 1.dp.toPx())
+    )
+    drawRect(
+        color = Color.White,
+        topLeft = Offset(x + spacing/2, y + spacing),
+        size = androidx.compose.ui.geometry.Size(squareSize, squareSize),
+        style = Stroke(width = 1.dp.toPx())
+    )
+    drawRect(
+        color = Color.White,
+        topLeft = Offset(x - squareSize/2, y - squareSize - spacing),
+        size = androidx.compose.ui.geometry.Size(squareSize, squareSize),
+        style = Stroke(width = 1.dp.toPx())
+    )
 }
 
 private fun DrawScope.drawHealthBar(unitGaming: UnitGaming, x: Float, y: Float, radius: Float) {

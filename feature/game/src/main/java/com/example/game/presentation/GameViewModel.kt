@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.math.cos
+import kotlin.math.sin
 
 data class GameUiState(
     val gameState: GameState = GameState(
@@ -70,15 +72,22 @@ class GameViewModel(
 
         // СОЗДАЕМ ЮНИТОВ ИЗ ПОКУПОК - ИСПРАВЛЕНИЕ ПРОБЛЕМЫ 1
         val purchasedPlayerUnits = mutableListOf<UnitGaming>()
+        val baseUnits = listOf(playerCommandPost, playerRadar) // Для проверки коллизий
+
         purchasedUnits.forEach { (unitType, quantity) ->
             repeat(quantity) {
                 val unitStats = GameConstants.UNIT_STATS[unitType] ?: return@repeat
 
-                // Создаем позицию рядом с КШМ игрока
-                val spawnPosition = Position(
-                    x = GameConstants.PLAYER_COMMAND_POST_POSITION.x + 100f + (Math.random().toFloat() * 200f),
-                    y = GameConstants.PLAYER_COMMAND_POST_POSITION.y - 100f + (Math.random().toFloat() * 200f)
-                )
+                // НОВАЯ ЛОГИКА: Специальное размещение для зенитки
+                val spawnPosition = if (unitType == UnitType.AIR_DEFENSE) {
+                    findAirDefensePosition(baseUnits + purchasedPlayerUnits)
+                } else {
+                    // Обычная логика для других юнитов
+                    Position(
+                        x = GameConstants.PLAYER_COMMAND_POST_POSITION.x + 100f + (Math.random().toFloat() * 200f),
+                        y = GameConstants.PLAYER_COMMAND_POST_POSITION.y - 100f + (Math.random().toFloat() * 200f)
+                    )
+                }
 
                 val newUnit = UnitGaming(
                     id = UUID.randomUUID().toString(),
@@ -93,7 +102,7 @@ class GameViewModel(
                 )
 
                 purchasedPlayerUnits.add(newUnit)
-                println("DEBUG: Created purchased unit: ${unitType.name}")
+                println("DEBUG: Created purchased unit: ${unitType.name} at (${spawnPosition.x}, ${spawnPosition.y})")
             }
         }
 
@@ -162,6 +171,68 @@ class GameViewModel(
         startGameLoop()
     }
 
+    // НОВАЯ ФУНКЦИЯ: Поиск подходящей позиции для зенитки
+    private fun findAirDefensePosition(existingUnits: List<UnitGaming>): Position {
+        val commandPostPos = GameConstants.PLAYER_COMMAND_POST_POSITION
+        val radarPos = GameConstants.PLAYER_RADAR_POSITION
+
+        // Пробуем разместить зенитку в нескольких позициях вокруг КШМ и РЛС
+        val candidatePositions = listOf(
+            // Вокруг КШМ
+            Position(commandPostPos.x + 80f, commandPostPos.y - 80f),
+            Position(commandPostPos.x - 80f, commandPostPos.y - 80f),
+            Position(commandPostPos.x + 80f, commandPostPos.y + 80f),
+            Position(commandPostPos.x - 80f, commandPostPos.y + 80f),
+            // Вокруг РЛС
+            Position(radarPos.x + 80f, radarPos.y - 80f),
+            Position(radarPos.x - 80f, radarPos.y - 80f),
+            Position(radarPos.x + 80f, radarPos.y + 80f),
+            Position(radarPos.x - 80f, radarPos.y + 80f),
+            // Между КШМ и РЛС
+            Position((commandPostPos.x + radarPos.x) / 2f, (commandPostPos.y + radarPos.y) / 2f - 60f),
+            Position((commandPostPos.x + radarPos.x) / 2f, (commandPostPos.y + radarPos.y) / 2f + 60f)
+        )
+
+        // Выбираем первую свободную позицию
+        for (position in candidatePositions) {
+            if (isPositionFree(position, existingUnits)) {
+                return position
+            }
+        }
+
+        // Если все позиции заняты, ищем случайную рядом с КШМ
+        var attempts = 0
+        while (attempts < 20) {
+            val angle = Math.random() * 2 * Math.PI
+            val distance = 60f + Math.random().toFloat() * 40f // От 60 до 100 пикселей от КШМ
+            val position = Position(
+                x = (commandPostPos.x + cos(angle) * distance).toFloat(),
+                y = (commandPostPos.y + sin(angle) * distance).toFloat()
+            )
+
+            if (isPositionFree(position, existingUnits) &&
+                position.x >= 0f && position.x <= GameConstants.FIELD_WIDTH &&
+                position.y >= 0f && position.y <= GameConstants.FIELD_HEIGHT) {
+                return position
+            }
+            attempts++
+        }
+
+        // В крайнем случае возвращаем позицию рядом с КШМ
+        return Position(commandPostPos.x + 60f, commandPostPos.y - 60f)
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Проверка свободности позиции
+    private fun isPositionFree(position: Position, existingUnits: List<UnitGaming>): Boolean {
+        val minDistance = 50f // Минимальное расстояние между юнитами
+        return existingUnits.none { unit ->
+            val dx = unit.position.x - position.x
+            val dy = unit.position.y - position.y
+            val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+            distance < minDistance
+        }
+    }
+
     fun spawnUnit(unitType: UnitType) {
         val currentState = _uiState.value.gameState
         if (!currentState.isGameActive || !currentState.playerCanControl) return
@@ -177,11 +248,16 @@ class GameViewModel(
             if (currentMissileCount >= GameConstants.MAX_MISSILES_PER_PLAYER) return
         }
 
-        // Создаем новый юнит рядом с КШМ игрока с большей зоной разброса для увеличенного поля
-        val spawnPosition = Position(
-            x = GameConstants.PLAYER_COMMAND_POST_POSITION.x + 100f + (Math.random().toFloat() * 200f),
-            y = GameConstants.PLAYER_COMMAND_POST_POSITION.y - 100f + (Math.random().toFloat() * 200f)
-        )
+        // ОБНОВЛЕННАЯ ЛОГИКА: Специальное размещение для зенитки при спавне в игре
+        val spawnPosition = if (unitType == UnitType.AIR_DEFENSE) {
+            findAirDefensePosition(currentState.playerUnitGamings)
+        } else {
+            // Обычная логика для других юнитов
+            Position(
+                x = GameConstants.PLAYER_COMMAND_POST_POSITION.x + 100f + (Math.random().toFloat() * 200f),
+                y = GameConstants.PLAYER_COMMAND_POST_POSITION.y - 100f + (Math.random().toFloat() * 200f)
+            )
+        }
 
         val newUnitGaming = UnitGaming(
             id = UUID.randomUUID().toString(),
