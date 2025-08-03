@@ -171,55 +171,79 @@ class GameViewModel(
         startGameLoop()
     }
 
-    // НОВАЯ ФУНКЦИЯ: Поиск подходящей позиции для зенитки
+    // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Размещение зенитки строго перед РЛС игрока
     private fun findAirDefensePosition(existingUnits: List<UnitGaming>): Position {
-        val commandPostPos = GameConstants.PLAYER_COMMAND_POST_POSITION
         val radarPos = GameConstants.PLAYER_RADAR_POSITION
 
-        // Пробуем разместить зенитку в нескольких позициях вокруг КШМ и РЛС
-        val candidatePositions = listOf(
-            // Вокруг КШМ
-            Position(commandPostPos.x + 80f, commandPostPos.y - 80f),
-            Position(commandPostPos.x - 80f, commandPostPos.y - 80f),
-            Position(commandPostPos.x + 80f, commandPostPos.y + 80f),
-            Position(commandPostPos.x - 80f, commandPostPos.y + 80f),
-            // Вокруг РЛС
-            Position(radarPos.x + 80f, radarPos.y - 80f),
-            Position(radarPos.x - 80f, radarPos.y - 80f),
-            Position(radarPos.x + 80f, radarPos.y + 80f),
-            Position(radarPos.x - 80f, radarPos.y + 80f),
-            // Между КШМ и РЛС
-            Position((commandPostPos.x + radarPos.x) / 2f, (commandPostPos.y + radarPos.y) / 2f - 60f),
-            Position((commandPostPos.x + radarPos.x) / 2f, (commandPostPos.y + radarPos.y) / 2f + 60f)
+        // Зенитка размещается перед РЛС игрока (ближе к центру поля)
+        // РЛС игрока находится в левом нижнем углу, значит "перед" = правее и выше
+
+        val preferredPositions = listOf(
+            // Основная позиция - прямо перед РЛС на расстоянии 80-120 пикселей
+            Position(radarPos.x + 100f, radarPos.y - 80f),
+            Position(radarPos.x + 120f, radarPos.y - 60f),
+            Position(radarPos.x + 80f, radarPos.y - 100f),
+
+            // Альтернативные позиции перед РЛС
+            Position(radarPos.x + 100f, radarPos.y - 120f),
+            Position(radarPos.x + 140f, radarPos.y - 80f),
+            Position(radarPos.x + 80f, radarPos.y - 60f),
+
+            // Дополнительные позиции в секторе перед РЛС
+            Position(radarPos.x + 90f, radarPos.y - 110f),
+            Position(radarPos.x + 110f, radarPos.y - 70f),
+            Position(radarPos.x + 130f, radarPos.y - 100f)
         )
 
         // Выбираем первую свободную позицию
-        for (position in candidatePositions) {
-            if (isPositionFree(position, existingUnits)) {
+        for (position in preferredPositions) {
+            if (isPositionValid(position, existingUnits)) {
+                println("DEBUG: Air defense placed at (${position.x}, ${position.y}) in front of radar")
                 return position
             }
         }
 
-        // Если все позиции заняты, ищем случайную рядом с КШМ
+        // Если все предпочтительные позиции заняты, ищем в секторе перед РЛС
         var attempts = 0
-        while (attempts < 20) {
-            val angle = Math.random() * 2 * Math.PI
-            val distance = 60f + Math.random().toFloat() * 40f // От 60 до 100 пикселей от КШМ
+        while (attempts < 30) {
+            // Генерируем позицию в секторе перед РЛС
+            val angle = Math.random() * Math.PI / 3 - Math.PI / 6 // Сектор ±30° от направления "вперед"
+            val distance = 80f + Math.random().toFloat() * 60f // От 80 до 140 пикселей от РЛС
+
             val position = Position(
-                x = (commandPostPos.x + cos(angle) * distance).toFloat(),
-                y = (commandPostPos.y + sin(angle) * distance).toFloat()
+                x = (radarPos.x + Math.cos(angle) * distance).toFloat(),
+                y = (radarPos.y - Math.sin(angle + Math.PI/4) * distance).toFloat() // Смещение вперед-вправо
             )
 
-            if (isPositionFree(position, existingUnits) &&
-                position.x >= 0f && position.x <= GameConstants.FIELD_WIDTH &&
-                position.y >= 0f && position.y <= GameConstants.FIELD_HEIGHT) {
+            if (isPositionValid(position, existingUnits)) {
+                println("DEBUG: Air defense placed at random position (${position.x}, ${position.y}) in front of radar")
                 return position
             }
             attempts++
         }
 
-        // В крайнем случае возвращаем позицию рядом с КШМ
-        return Position(commandPostPos.x + 60f, commandPostPos.y - 60f)
+        // В крайнем случае размещаем на фиксированной позиции перед РЛС
+        val fallbackPosition = Position(radarPos.x + 100f, radarPos.y - 80f)
+        println("DEBUG: Air defense placed at fallback position (${fallbackPosition.x}, ${fallbackPosition.y})")
+        return fallbackPosition
+    }
+
+    // УЛУЧШЕННАЯ ФУНКЦИЯ: Проверка валидности позиции
+    private fun isPositionValid(position: Position, existingUnits: List<UnitGaming>): Boolean {
+        // Проверяем, что позиция в пределах поля
+        if (position.x < 50f || position.x > GameConstants.FIELD_WIDTH - 50f ||
+            position.y < 50f || position.y > GameConstants.FIELD_HEIGHT - 50f) {
+            return false
+        }
+
+        // Проверяем минимальное расстояние до других юнитов (60 пикселей)
+        val minDistance = 60f
+        return existingUnits.none { unit ->
+            val dx = unit.position.x - position.x
+            val dy = unit.position.y - position.y
+            val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+            distance < minDistance
+        }
     }
 
     // НОВАЯ ФУНКЦИЯ: Проверка свободности позиции
@@ -232,13 +256,20 @@ class GameViewModel(
             distance < minDistance
         }
     }
-
     fun spawnUnit(unitType: UnitType) {
         val currentState = _uiState.value.gameState
         if (!currentState.isGameActive || !currentState.playerCanControl) return
 
         val unitStats = GameConstants.UNIT_STATS[unitType] ?: return
         if (currentState.playerPoints < unitStats.cost) return
+
+        // Проверка ограничения на зенитки
+        if (unitType == UnitType.AIR_DEFENSE) {
+            val currentAirDefenseCount = currentState.playerUnitGamings.count {
+                it.type == UnitType.AIR_DEFENSE && it.isAlive
+            }
+            if (currentAirDefenseCount >= GameConstants.MAX_AIR_DEFENSE_PER_PLAYER) return
+        }
 
         // Проверка ограничения на ракеты
         if (unitType == UnitType.MISSILE) {
@@ -248,7 +279,7 @@ class GameViewModel(
             if (currentMissileCount >= GameConstants.MAX_MISSILES_PER_PLAYER) return
         }
 
-        // ОБНОВЛЕННАЯ ЛОГИКА: Специальное размещение для зенитки при спавне в игре
+        // ИСПРАВЛЕННОЕ РАЗМЕЩЕНИЕ: Зенитка строится перед РЛС
         val spawnPosition = if (unitType == UnitType.AIR_DEFENSE) {
             findAirDefensePosition(currentState.playerUnitGamings)
         } else {
@@ -278,6 +309,8 @@ class GameViewModel(
         )
 
         _uiState.value = _uiState.value.copy(gameState = updatedGameState)
+
+        println("DEBUG: Spawned ${unitType.name} at position (${spawnPosition.x}, ${spawnPosition.y})")
     }
 
     fun onFieldClick(position: Position) {

@@ -72,5 +72,22 @@ data class GameState(
     val isGameActive: Boolean,
     val winner: PlayerSide? = null,
     val playerCanControl: Boolean = true, // РЛС работает
-    val enemyCanControl: Boolean = true
+    val enemyCanControl: Boolean = true,
+    // НОВОЕ: Добавляем ракеты зенитки
+    val airDefenseMissiles: List<AirDefenseMissile> = emptyList()
+) : Parcelable
+// Добавить в GameModels.kt
+
+@Serializable
+@Parcelize
+data class AirDefenseMissile(
+    val id: String,
+    val position: Position,
+    val targetId: String,
+    val targetPosition: Position,
+    val shooterId: String, // ID зенитки, которая выпустила ракету
+    val speed: Float = 6f, // Быстрые ракеты зенитки
+    val damage: Int = 80,
+    val side: PlayerSide,
+    val creationTime: Long = System.currentTimeMillis()
 ) : Parcelable

@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.common.constants.GameConstants
 import com.example.common.model.UnitStats
 import com.example.common.model.UnitType
 import org.koin.androidx.compose.koinViewModel
@@ -205,13 +206,22 @@ private fun UnitCard(
     onPurchase: () -> Unit,
     onSell: () -> Unit
 ) {
+    // ДОРАБОТКА 1: Проверяем ограничение на зенитку
+    val canPurchaseMore = if (unitStats.type == UnitType.AIR_DEFENSE) {
+        quantity < GameConstants.MAX_AIR_DEFENSE_PER_PLAYER
+    } else {
+        true
+    }
+
+    val canActuallyPurchase = canAfford && canPurchaseMore
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(120.dp)
             .border(
                 width = 1.dp,
-                color = if (canAfford) Color(0xFF4CAF50) else Color.Gray,
+                color = if (canActuallyPurchase) Color(0xFF4CAF50) else Color.Gray,
                 shape = RoundedCornerShape(8.dp)
             ),
         shape = RoundedCornerShape(8.dp),
@@ -243,6 +253,14 @@ private fun UnitCard(
                     fontSize = 8.sp,
                     color = Color.Gray
                 )
+                // ДОРАБОТКА 1: Показываем ограничение для зенитки
+                if (unitStats.type == UnitType.AIR_DEFENSE) {
+                    Text(
+                        text = "Макс: ${GameConstants.MAX_AIR_DEFENSE_PER_PLAYER} шт.",
+                        fontSize = 7.sp,
+                        color = Color.Yellow
+                    )
+                }
             }
 
             Row(
@@ -268,12 +286,12 @@ private fun UnitCard(
 
                 TextButton(
                     onClick = onPurchase,
-                    enabled = canAfford,
+                    enabled = canActuallyPurchase,
                     contentPadding = PaddingValues(4.dp)
                 ) {
                     Text(
                         "+",
-                        color = if (canAfford) Color.Green else Color.Gray,
+                        color = if (canActuallyPurchase) Color.Green else Color.Gray,
                         fontSize = 14.sp
                     )
                 }

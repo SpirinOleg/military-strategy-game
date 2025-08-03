@@ -5,6 +5,7 @@ import com.example.common.model.GameState
 import com.example.common.model.PlayerSide
 import com.example.common.model.Position
 import com.example.common.model.UnitType
+import com.example.common.model.AirDefenseMissile
 import kotlin.math.*
 import kotlin.random.Random
 import com.example.common.model.UnitGaming
@@ -20,19 +21,82 @@ class GameEngine {
         // 2. Обновляем перемещения всех юнитов
         updatedState = updateUnitMovement(updatedState)
 
-        // 3. Обрабатываем атаки
+        // 3. НОВОЕ: Обновляем ракеты зенитки
+        updatedState = updateAirDefenseMissiles(updatedState)
+
+        // 4. Обрабатываем атаки (теперь включая создание ракет зенитки)
         updatedState = processAttacks(updatedState)
 
-        // 4. Удаляем мертвых юнитов и начисляем награды
+        // 5. Удаляем мертвых юнитов и начисляем награды
         updatedState = cleanupDeadUnits(updatedState)
 
-        // 5. Обновляем статусы управления (РЛС)
+        // 6. Обновляем статусы управления (РЛС)
         updatedState = updateControlStatus(updatedState)
 
-        // 6. Обрабатываем специальную логику (самолеты, укрепления)
+        // 7. Обрабатываем специальную логику (самолеты, укрепления)
         updatedState = processSpecialUnits(updatedState)
 
         return updatedState
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Обновление ракет зенитки
+    private fun updateAirDefenseMissiles(gameState: GameState): GameState {
+        val updatedMissiles = mutableListOf<AirDefenseMissile>()
+        var updatedPlayerUnits = gameState.playerUnitGamings.toMutableList()
+        var updatedEnemyUnits = gameState.enemyUnitGamings.toMutableList()
+
+        gameState.airDefenseMissiles.forEach { missile ->
+            // Находим цель
+            val allTargets = if (missile.side == PlayerSide.BLUE) updatedEnemyUnits else updatedPlayerUnits
+            val target = allTargets.find { it.id == missile.targetId && it.isAlive }
+
+            if (target != null) {
+                // Вычисляем новую позицию ракеты
+                val distanceToTarget = calculateDistance(missile.position, target.position)
+
+                if (distanceToTarget <= 15f) {
+                    // ПОПАДАНИЕ! Наносим урон цели
+                    val updatedTarget = target.copy(
+                        health = maxOf(0, target.health - missile.damage),
+                        isAlive = target.health - missile.damage > 0
+                    )
+
+                    if (missile.side == PlayerSide.BLUE) {
+                        val targetIndex = updatedEnemyUnits.indexOfFirst { it.id == target.id }
+                        if (targetIndex != -1) {
+                            updatedEnemyUnits[targetIndex] = updatedTarget
+                        }
+                    } else {
+                        val targetIndex = updatedPlayerUnits.indexOfFirst { it.id == target.id }
+                        if (targetIndex != -1) {
+                            updatedPlayerUnits[targetIndex] = updatedTarget
+                        }
+                    }
+                    // Ракета уничтожается при попадании
+                } else {
+                    // Продолжаем движение к цели
+                    val direction = calculateDirection(missile.position, target.position)
+                    val newPosition = Position(
+                        x = missile.position.x + direction.x * missile.speed,
+                        y = missile.position.y + direction.y * missile.speed
+                    )
+
+                    updatedMissiles.add(
+                        missile.copy(
+                            position = newPosition,
+                            targetPosition = target.position // Обновляем позицию цели
+                        )
+                    )
+                }
+            }
+            // Если цель уничтожена или не найдена, ракета исчезает
+        }
+
+        return gameState.copy(
+            playerUnitGamings = updatedPlayerUnits,
+            enemyUnitGamings = updatedEnemyUnits,
+            airDefenseMissiles = updatedMissiles
+        )
     }
 
     private fun updateEnemyAI(gameState: GameState): GameState {
@@ -52,10 +116,20 @@ class GameEngine {
             UnitType.RIFLEMAN,
             UnitType.MACHINE_GUNNER,
             UnitType.ROCKET_SOLDIER,
-            UnitType.AIR_DEFENSE // НОВОЕ: AI тоже может создавать зенитки
+            UnitType.AIR_DEFENSE // AI тоже может создавать зенитки
         ).filter {
             val cost = GameConstants.UNIT_STATS[it]?.cost ?: Int.MAX_VALUE
-            gameState.enemyPoints >= cost
+            val canAfford = gameState.enemyPoints >= cost
+
+            // Ограничение на зенитку для AI тоже
+            if (it == UnitType.AIR_DEFENSE) {
+                val hasAirDefense = gameState.enemyUnitGamings.any { unit ->
+                    unit.type == UnitType.AIR_DEFENSE && unit.isAlive
+                }
+                canAfford && !hasAirDefense
+            } else {
+                canAfford
+            }
         }
 
         if (availableUnits.isEmpty()) return gameState
@@ -63,7 +137,7 @@ class GameEngine {
         val selectedUnitType = availableUnits.random()
         val unitStats = GameConstants.UNIT_STATS[selectedUnitType] ?: return gameState
 
-        // ОБНОВЛЕННАЯ ЛОГИКА: Специальное размещение для зенитки противника
+        // Специальное размещение для зенитки противника
         val spawnPosition = if (selectedUnitType == UnitType.AIR_DEFENSE) {
             findEnemyAirDefensePosition(gameState.enemyUnitGamings)
         } else {
@@ -92,7 +166,6 @@ class GameEngine {
         )
     }
 
-    // НОВАЯ ФУНКЦИЯ: Поиск подходящей позиции для зенитки противника
     private fun findEnemyAirDefensePosition(existingUnits: List<UnitGaming>): Position {
         val commandPostPos = GameConstants.ENEMY_COMMAND_POST_POSITION
         val radarPos = GameConstants.ENEMY_RADAR_POSITION
@@ -143,7 +216,6 @@ class GameEngine {
         return Position(commandPostPos.x - 60f, commandPostPos.y + 60f)
     }
 
-    // НОВАЯ ФУНКЦИЯ: Проверка свободности позиции
     private fun isPositionFree(position: Position, existingUnits: List<UnitGaming>): Boolean {
         val minDistance = 50f // Минимальное расстояние между юнитами
         return existingUnits.none { unit ->
@@ -172,117 +244,231 @@ class GameEngine {
     private fun moveUnitTowardsTarget(unitGaming: UnitGaming, gameState: GameState): UnitGaming {
         if (unitGaming.speed == 0f || !unitGaming.isAlive) return unitGaming
 
-        // НОВОЕ: Зенитная установка неподвижна, но может атаковать
+        // УЛУЧШЕННАЯ ЛОГИКА ЗЕНИТКИ: Приоритетное поражение всех воздушных целей
         if (unitGaming.type == UnitType.AIR_DEFENSE) {
-            // Ищем приоритетные воздушные цели (ракеты и самолеты)
             val enemies = if (unitGaming.side == PlayerSide.BLUE) gameState.enemyUnitGamings else gameState.playerUnitGamings
-            val airTargets = enemies.filter {
-                it.isAlive && (it.type == UnitType.MISSILE || it.type == UnitType.AIRPLANE)
+
+            // СТРОГИЙ ПРИОРИТЕТ: Сначала ракеты (самые опасные), потом самолеты, потом вертолеты
+            val missiles = enemies.filter { it.isAlive && it.type == UnitType.MISSILE }
+            val airplanes = enemies.filter { it.isAlive && it.type == UnitType.AIRPLANE }
+            val helicopters = enemies.filter { it.isAlive && it.type == UnitType.HELICOPTER }
+
+            // Ищем ближайшую ракету в радиусе поражения
+            val nearestMissile = missiles
+                .filter { calculateDistance(unitGaming.position, it.position) <= unitGaming.range }
+                .minByOrNull { calculateDistance(unitGaming.position, it.position) }
+
+            if (nearestMissile != null) {
+                println("DEBUG: Air defense ${unitGaming.id} targeting missile ${nearestMissile.id}")
+                return unitGaming.copy(target = nearestMissile.id)
             }
 
-            val nearestAirTarget = airTargets.minByOrNull {
-                calculateDistance(unitGaming.position, it.position)
+            // Если нет ракет, ищем ближайший самолет в радиусе поражения
+            val nearestAirplane = airplanes
+                .filter { calculateDistance(unitGaming.position, it.position) <= unitGaming.range }
+                .minByOrNull { calculateDistance(unitGaming.position, it.position) }
+
+            if (nearestAirplane != null) {
+                println("DEBUG: Air defense ${unitGaming.id} targeting airplane ${nearestAirplane.id}")
+                return unitGaming.copy(target = nearestAirplane.id)
             }
 
-            if (nearestAirTarget != null) {
-                val distanceToTarget = calculateDistance(unitGaming.position, nearestAirTarget.position)
-                if (distanceToTarget <= unitGaming.range) {
-                    return unitGaming.copy(target = nearestAirTarget.id)
-                }
+            // Если нет самолетов, ищем ближайший вертолет в радиусе поражения
+            val nearestHelicopter = helicopters
+                .filter { calculateDistance(unitGaming.position, it.position) <= unitGaming.range }
+                .minByOrNull { calculateDistance(unitGaming.position, it.position) }
+
+            if (nearestHelicopter != null) {
+                println("DEBUG: Air defense ${unitGaming.id} targeting helicopter ${nearestHelicopter.id}")
+                return unitGaming.copy(target = nearestHelicopter.id)
             }
 
-            // Если нет воздушных целей, атакуем ближайшего врага
-            val nearestEnemy = findNearestEnemy(unitGaming, enemies)
-            if (nearestEnemy != null) {
-                val distanceToEnemy = calculateDistance(unitGaming.position, nearestEnemy.position)
-                if (distanceToEnemy <= unitGaming.range) {
-                    return unitGaming.copy(target = nearestEnemy.id)
-                }
+            // Если нет воздушных целей в радиусе, атакуем ближайшего наземного врага
+            val nearestGroundEnemy = enemies
+                .filter { it.isAlive && it.type != UnitType.MISSILE && it.type != UnitType.AIRPLANE && it.type != UnitType.HELICOPTER }
+                .filter { calculateDistance(unitGaming.position, it.position) <= unitGaming.range }
+                .minByOrNull { calculateDistance(unitGaming.position, it.position) }
+
+            if (nearestGroundEnemy != null) {
+                println("DEBUG: Air defense ${unitGaming.id} targeting ground unit ${nearestGroundEnemy.id}")
+                return unitGaming.copy(target = nearestGroundEnemy.id)
             }
 
-            return unitGaming
+            // Если нет целей в радиусе, сбрасываем цель
+            return unitGaming.copy(target = null)
         }
 
-        // Находим ближайшего врага для обычных юнитов
+        // Остальная логика для других юнитов остается без изменений...
         val enemies = if (unitGaming.side == PlayerSide.BLUE) gameState.enemyUnitGamings else gameState.playerUnitGamings
-        val nearestEnemy = findNearestEnemy(unitGaming, enemies) ?: return unitGaming
 
-        // Если враг в радиусе атаки, не двигаемся
-        val distanceToEnemy = calculateDistance(unitGaming.position, nearestEnemy.position)
-        if (distanceToEnemy <= unitGaming.range) {
-            return unitGaming.copy(target = nearestEnemy.id)
+        // Сначала ищем цели, которых можем атаковать
+        val attackableEnemies = enemies.filter { enemy ->
+            enemy.isAlive && canAttackTarget(unitGaming, enemy)
         }
 
-        // Двигаемся к врагу
-        val direction = calculateDirection(unitGaming.position, nearestEnemy.position)
-        val newPosition = Position(
-            x = (unitGaming.position.x + direction.x * unitGaming.speed).coerceIn(0f, GameConstants.FIELD_WIDTH),
-            y = (unitGaming.position.y + direction.y * unitGaming.speed).coerceIn(0f, GameConstants.FIELD_HEIGHT)
-        )
+        val nearestAttackableEnemy = attackableEnemies.minByOrNull {
+            calculateDistance(unitGaming.position, it.position)
+        }
 
-        return unitGaming.copy(
-            position = newPosition,
-            target = nearestEnemy.id
-        )
+        if (nearestAttackableEnemy != null) {
+            val distanceToEnemy = calculateDistance(unitGaming.position, nearestAttackableEnemy.position)
+
+            if (distanceToEnemy <= unitGaming.range) {
+                // Можем атаковать - останавливаемся и атакуем
+                return unitGaming.copy(target = nearestAttackableEnemy.id)
+            } else {
+                // Двигаемся к цели, которую можем атаковать
+                val direction = calculateDirection(unitGaming.position, nearestAttackableEnemy.position)
+                val newPosition = Position(
+                    x = (unitGaming.position.x + direction.x * unitGaming.speed).coerceIn(0f, GameConstants.FIELD_WIDTH),
+                    y = (unitGaming.position.y + direction.y * unitGaming.speed).coerceIn(0f, GameConstants.FIELD_HEIGHT)
+                )
+
+                return unitGaming.copy(
+                    position = newPosition,
+                    target = nearestAttackableEnemy.id
+                )
+            }
+        }
+
+        // Если нет атакуемых целей, продолжаем движение к любому врагу
+        val anyNearestEnemy = findNearestEnemy(unitGaming, enemies)
+        if (anyNearestEnemy != null) {
+            // Двигаемся к любому врагу, даже если не можем его атаковать
+            val direction = calculateDirection(unitGaming.position, anyNearestEnemy.position)
+            val newPosition = Position(
+                x = (unitGaming.position.x + direction.x * unitGaming.speed).coerceIn(0f, GameConstants.FIELD_WIDTH),
+                y = (unitGaming.position.y + direction.y * unitGaming.speed).coerceIn(0f, GameConstants.FIELD_HEIGHT)
+            )
+
+            return unitGaming.copy(
+                position = newPosition,
+                target = null // Не устанавливаем цель, если не можем атаковать
+            )
+        }
+
+        return unitGaming
     }
 
+    // НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Проверка возможности атаки цели (без учета дистанции и кулдауна)
+    private fun canAttackTarget(attacker: UnitGaming, target: UnitGaming): Boolean {
+        if (!target.isAlive) return false
+
+        // Зенитки могут атаковать любые цели
+        if (attacker.type == UnitType.AIR_DEFENSE) {
+            return true
+        }
+
+        // Воздушные цели могут быть сбиты зенитками, самолетами и вертолетами
+        if (target.type == UnitType.MISSILE || target.type == UnitType.AIRPLANE || target.type == UnitType.HELICOPTER) {
+            return attacker.type == UnitType.AIR_DEFENSE ||
+                    attacker.type == UnitType.AIRPLANE ||
+                    attacker.type == UnitType.HELICOPTER
+        }
+
+        // Все юниты могут атаковать наземные цели
+        return true
+    }
     private fun processAttacks(gameState: GameState): GameState {
         val currentTime = System.currentTimeMillis()
 
         var updatedPlayerUnits = gameState.playerUnitGamings.toMutableList()
         var updatedEnemyUnits = gameState.enemyUnitGamings.toMutableList()
+        var updatedMissiles = gameState.airDefenseMissiles.toMutableList()
 
         // Обрабатываем атаки игроков
         updatedPlayerUnits.forEachIndexed { index, unit ->
             if (unit.isAlive && unit.damage > 0 && unit.target != null) {
                 val target = updatedEnemyUnits.find { it.id == unit.target }
                 if (target != null && canAttack(unit, target, currentTime)) {
-                    val updatedTarget = target.copy(
-                        health = maxOf(0, target.health - unit.damage),
-                        isAlive = target.health - unit.damage > 0
-                    )
 
-                    val targetIndex = updatedEnemyUnits.indexOfFirst { it.id == target.id }
-                    if (targetIndex != -1) {
-                        updatedEnemyUnits[targetIndex] = updatedTarget
-                    }
+                    // ЗЕНИТКА: создает ракету вместо мгновенного урона
+                    if (unit.type == UnitType.AIR_DEFENSE) {
+                        val distance = calculateDistance(unit.position, target.position)
+                        println("DEBUG: Player air defense attacking ${target.type.name} at distance $distance (max range: ${unit.range})")
 
-                    // ДОРАБОТКА 3: Ракета уничтожается сразу после атаки
-                    if (unit.type == UnitType.MISSILE) {
-                        updatedPlayerUnits[index] = unit.copy(
-                            lastAttackTime = currentTime,
-                            isAlive = false // Ракета уничтожается после попадания
+                        val newMissile = AirDefenseMissile(
+                            id = generateId(),
+                            position = unit.position.copy(),
+                            targetId = target.id,
+                            targetPosition = target.position.copy(),
+                            shooterId = unit.id,
+                            side = unit.side
                         )
-                    } else {
+                        updatedMissiles.add(newMissile)
                         updatedPlayerUnits[index] = unit.copy(lastAttackTime = currentTime)
+
+                        println("DEBUG: Created air defense missile ${newMissile.id} targeting ${target.type.name}")
+                    } else {
+                        // Обычная атака для других юнитов
+                        val updatedTarget = target.copy(
+                            health = maxOf(0, target.health - unit.damage),
+                            isAlive = target.health - unit.damage > 0
+                        )
+
+                        val targetIndex = updatedEnemyUnits.indexOfFirst { it.id == target.id }
+                        if (targetIndex != -1) {
+                            updatedEnemyUnits[targetIndex] = updatedTarget
+                        }
+
+                        // Ракета и самолет уничтожаются сразу после атаки
+                        if (unit.type == UnitType.MISSILE || unit.type == UnitType.AIRPLANE) {
+                            updatedPlayerUnits[index] = unit.copy(
+                                lastAttackTime = currentTime,
+                                isAlive = false
+                            )
+                        } else {
+                            updatedPlayerUnits[index] = unit.copy(lastAttackTime = currentTime)
+                        }
                     }
                 }
             }
         }
 
-        // Обрабатываем атаки противника
+        // Обрабатываем атаки противника (аналогично)
         updatedEnemyUnits.forEachIndexed { index, unit ->
             if (unit.isAlive && unit.damage > 0 && unit.target != null) {
                 val target = updatedPlayerUnits.find { it.id == unit.target }
                 if (target != null && canAttack(unit, target, currentTime)) {
-                    val updatedTarget = target.copy(
-                        health = maxOf(0, target.health - unit.damage),
-                        isAlive = target.health - unit.damage > 0
-                    )
 
-                    val targetIndex = updatedPlayerUnits.indexOfFirst { it.id == target.id }
-                    if (targetIndex != -1) {
-                        updatedPlayerUnits[targetIndex] = updatedTarget
-                    }
+                    // ЗЕНИТКА ПРОТИВНИКА: тоже создает ракету
+                    if (unit.type == UnitType.AIR_DEFENSE) {
+                        val distance = calculateDistance(unit.position, target.position)
+                        println("DEBUG: Enemy air defense attacking ${target.type.name} at distance $distance (max range: ${unit.range})")
 
-                    // ДОРАБОТКА 3: Ракета противника тоже уничтожается после атаки
-                    if (unit.type == UnitType.MISSILE) {
-                        updatedEnemyUnits[index] = unit.copy(
-                            lastAttackTime = currentTime,
-                            isAlive = false // Ракета уничтожается после попадания
+                        val newMissile = AirDefenseMissile(
+                            id = generateId(),
+                            position = unit.position.copy(),
+                            targetId = target.id,
+                            targetPosition = target.position.copy(),
+                            shooterId = unit.id,
+                            side = unit.side
                         )
-                    } else {
+                        updatedMissiles.add(newMissile)
                         updatedEnemyUnits[index] = unit.copy(lastAttackTime = currentTime)
+
+                        println("DEBUG: Created enemy air defense missile ${newMissile.id} targeting ${target.type.name}")
+                    } else {
+                        // Обычная атака для других юнитов
+                        val updatedTarget = target.copy(
+                            health = maxOf(0, target.health - unit.damage),
+                            isAlive = target.health - unit.damage > 0
+                        )
+
+                        val targetIndex = updatedPlayerUnits.indexOfFirst { it.id == target.id }
+                        if (targetIndex != -1) {
+                            updatedPlayerUnits[targetIndex] = updatedTarget
+                        }
+
+                        // Ракета и самолет противника тоже уничтожаются после атаки
+                        if (unit.type == UnitType.MISSILE || unit.type == UnitType.AIRPLANE) {
+                            updatedEnemyUnits[index] = unit.copy(
+                                lastAttackTime = currentTime,
+                                isAlive = false
+                            )
+                        } else {
+                            updatedEnemyUnits[index] = unit.copy(lastAttackTime = currentTime)
+                        }
                     }
                 }
             }
@@ -290,9 +476,11 @@ class GameEngine {
 
         return gameState.copy(
             playerUnitGamings = updatedPlayerUnits,
-            enemyUnitGamings = updatedEnemyUnits
+            enemyUnitGamings = updatedEnemyUnits,
+            airDefenseMissiles = updatedMissiles
         )
     }
+
 
     private fun cleanupDeadUnits(gameState: GameState): GameState {
         val alivePlayers = gameState.playerUnitGamings.filter { it.isAlive }
@@ -328,40 +516,8 @@ class GameEngine {
     }
 
     private fun processSpecialUnits(gameState: GameState): GameState {
-        // Обрабатываем самолеты (исчезают через время)
-        val currentTime = System.currentTimeMillis()
-
-        val updatedPlayerUnits = gameState.playerUnitGamings.map { unit ->
-            if (unit.type == UnitType.AIRPLANE) {
-                // Самолеты живут ограниченное время
-                val timeSinceSpawn = currentTime - (unit.lastAttackTime - GameConstants.AIRPLANE_LIFETIME)
-                if (timeSinceSpawn > GameConstants.AIRPLANE_LIFETIME) {
-                    unit.copy(isAlive = false)
-                } else {
-                    unit
-                }
-            } else {
-                unit
-            }
-        }
-
-        val updatedEnemyUnits = gameState.enemyUnitGamings.map { unit ->
-            if (unit.type == UnitType.AIRPLANE) {
-                val timeSinceSpawn = currentTime - (unit.lastAttackTime - GameConstants.AIRPLANE_LIFETIME)
-                if (timeSinceSpawn > GameConstants.AIRPLANE_LIFETIME) {
-                    unit.copy(isAlive = false)
-                } else {
-                    unit
-                }
-            } else {
-                unit
-            }
-        }
-
-        return gameState.copy(
-            playerUnitGamings = updatedPlayerUnits,
-            enemyUnitGamings = updatedEnemyUnits
-        )
+        // Убрал логику времени жизни самолетов, так как они теперь уничтожаются сразу после атаки
+        return gameState
     }
 
     private fun findNearestEnemy(unitGaming: UnitGaming, enemies: List<UnitGaming>): UnitGaming? {
@@ -384,18 +540,33 @@ class GameEngine {
         )
     }
 
+    // ПРОВЕРЕННАЯ ФУНКЦИЯ: Может ли юнит атаковать цель
     private fun canAttack(attacker: UnitGaming, target: UnitGaming, currentTime: Long): Boolean {
         val distance = calculateDistance(attacker.position, target.position)
         val canReachTarget = distance <= attacker.range
         val cooldownPassed = currentTime - attacker.lastAttackTime >= GameConstants.ATTACK_COOLDOWN
 
-        // НОВАЯ ЛОГИКА: Ракеты могут быть сбиты только зенитками или самолетами
-        if (target.type == UnitType.MISSILE) {
-            val canInterceptMissile = attacker.type == UnitType.AIR_DEFENSE || attacker.type == UnitType.AIRPLANE
-            return canReachTarget && cooldownPassed && target.isAlive && canInterceptMissile
+        // Базовые условия для атаки
+        if (!canReachTarget || !cooldownPassed || !target.isAlive) {
+            return false
         }
 
-        return canReachTarget && cooldownPassed && target.isAlive
+        // ЗЕНИТКА: может атаковать ВСЕ цели в радиусе поражения
+        if (attacker.type == UnitType.AIR_DEFENSE) {
+            println("DEBUG: Air defense can attack ${target.type.name} at distance $distance")
+            return true
+        }
+
+        // ВОЗДУШНЫЕ ЦЕЛИ: могут быть сбиты зенитками, самолетами и вертолетами
+        if (target.type == UnitType.MISSILE || target.type == UnitType.AIRPLANE || target.type == UnitType.HELICOPTER) {
+            val canInterceptAircraft = attacker.type == UnitType.AIR_DEFENSE ||
+                    attacker.type == UnitType.AIRPLANE ||
+                    attacker.type == UnitType.HELICOPTER
+            return canInterceptAircraft
+        }
+
+        // Все остальные юниты могут атаковать наземные цели
+        return true
     }
 
     private fun generateId(): String {

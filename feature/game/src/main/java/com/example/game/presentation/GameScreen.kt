@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.common.constants.GameConstants
+import com.example.common.model.AirDefenseMissile
 import com.example.common.model.GameState
 import com.example.common.model.PlayerSide
 import com.example.common.model.UnitType
@@ -178,12 +179,19 @@ private fun drawGameField(
 
         drawGrid(scaleX, scaleY)
 
+        // Отрисовываем юнитов игрока
         gameState.playerUnitGamings.forEach { unit ->
             drawUnit(unit, scaleX, scaleY, Color.Blue)
         }
 
+        // Отрисовываем юнитов противника
         gameState.enemyUnitGamings.forEach { unit ->
             drawUnit(unit, scaleX, scaleY, Color.Red)
+        }
+
+        // НОВОЕ: Отрисовываем ракеты зенитки
+        gameState.airDefenseMissiles.forEach { missile ->
+            drawAirDefenseMissile(missile, scaleX, scaleY)
         }
     }
 }
@@ -215,6 +223,8 @@ private fun DrawScope.drawGrid(scaleX: Float, scaleY: Float) {
     }
 }
 
+
+// ОБНОВЛЕННАЯ ФУНКЦИЯ: Отрисовка юнита с толще радиусом для зенитки
 private fun DrawScope.drawUnit(
     unitGaming: UnitGaming,
     scaleX: Float,
@@ -225,7 +235,7 @@ private fun DrawScope.drawUnit(
     val y = unitGaming.position.y * scaleY
     val radius = getUnitRadius(unitGaming.type)
 
-    // НОВОЕ: Специальное отображение для зенитки в виде пирамиды из квадратиков
+    // Специальное отображение для зенитки в виде пирамиды из квадратиков
     if (unitGaming.type == UnitType.AIR_DEFENSE) {
         drawAirDefenseUnit(x, y, color, scaleX)
     } else {
@@ -245,12 +255,25 @@ private fun DrawScope.drawUnit(
 
     drawHealthBar(unitGaming, x, y, radius * scaleX)
 
+    // Радиус поражения - для зенитки делаем толще и ярче
     if (unitGaming.range > 0) {
+        val strokeWidth = if (unitGaming.type == UnitType.AIR_DEFENSE) {
+            4.dp.toPx() // Толще радиус для зенитки
+        } else {
+            1.dp.toPx() // Обычный радиус для других юнитов
+        }
+
+        val rangeAlpha = if (unitGaming.type == UnitType.AIR_DEFENSE) {
+            0.2f // Ярче для зенитки
+        } else {
+            0.1f // Обычная прозрачность
+        }
+
         drawCircle(
-            color = color.copy(alpha = 0.1f),
+            color = color.copy(alpha = rangeAlpha),
             radius = unitGaming.range * scaleX,
             center = Offset(x, y),
-            style = Stroke(width = 1.dp.toPx())
+            style = Stroke(width = strokeWidth)
         )
     }
 }
@@ -365,6 +388,57 @@ private fun UnitSpawnPanel(
     }
 }
 
+private fun DrawScope.drawAirDefenseMissile(
+    missile: AirDefenseMissile,
+    scaleX: Float,
+    scaleY: Float
+) {
+    val x = missile.position.x * scaleX
+    val y = missile.position.y * scaleY
+    val targetX = missile.targetPosition.x * scaleX
+    val targetY = missile.targetPosition.y * scaleY
+
+    val missileColor = if (missile.side == PlayerSide.BLUE) Color.Cyan else Color.Magenta
+
+    // Рисуем ракету как маленький кружок
+    drawCircle(
+        color = missileColor,
+        radius = 6f * scaleX,
+        center = Offset(x, y)
+    )
+
+    // Рисуем белую обводку
+    drawCircle(
+        color = Color.White,
+        radius = 6f * scaleX,
+        center = Offset(x, y),
+        style = Stroke(width = 1.5.dp.toPx())
+    )
+
+    // НОВОЕ: Рисуем след ракеты (линию к цели)
+    drawLine(
+        color = missileColor.copy(alpha = 0.4f),
+        start = Offset(x, y),
+        end = Offset(targetX, targetY),
+        strokeWidth = 2.dp.toPx()
+    )
+
+    // НОВОЕ: Рисуем направляющую точку (маленький крестик на цели)
+    val crossSize = 8f * scaleX
+    drawLine(
+        color = missileColor.copy(alpha = 0.7f),
+        start = Offset(targetX - crossSize, targetY),
+        end = Offset(targetX + crossSize, targetY),
+        strokeWidth = 2.dp.toPx()
+    )
+    drawLine(
+        color = missileColor.copy(alpha = 0.7f),
+        start = Offset(targetX, targetY - crossSize),
+        end = Offset(targetX, targetY + crossSize),
+        strokeWidth = 2.dp.toPx()
+    )
+}
+
 @Composable
 private fun UnitSpawnButton(
     unitType: UnitType,
@@ -451,6 +525,7 @@ private fun getUnitShortName(unitType: UnitType): String {
     }
 }
 
+// ДОРАБОТКА 1: Исправленная функция canSpawnUnit с ограничением на зенитку
 private fun canSpawnUnit(unitType: UnitType, gameState: GameState): Boolean {
     val unitStats = GameConstants.UNIT_STATS[unitType] ?: return false
 
@@ -459,7 +534,17 @@ private fun canSpawnUnit(unitType: UnitType, gameState: GameState): Boolean {
     val gameIsActive = gameState.isGameActive
     val canControl = gameState.playerCanControl
 
-    // НОВОЕ: Специальная проверка для ракет - ограничение количества
+    // ДОРАБОТКА 1: Специальная проверка для зенитки - ограничение количества
+    if (unitType == UnitType.AIR_DEFENSE) {
+        val currentAirDefenseCount = gameState.playerUnitGamings.count {
+            it.type == UnitType.AIR_DEFENSE && it.isAlive
+        }
+        val airDefenseLimit = currentAirDefenseCount < GameConstants.MAX_AIR_DEFENSE_PER_PLAYER
+
+        return hasEnoughPoints && gameIsActive && canControl && airDefenseLimit
+    }
+
+    // Специальная проверка для ракет - ограничение количества
     if (unitType == UnitType.MISSILE) {
         val currentMissileCount = gameState.playerUnitGamings.count {
             it.type == UnitType.MISSILE && it.isAlive

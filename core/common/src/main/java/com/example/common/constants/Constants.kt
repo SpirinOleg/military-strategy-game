@@ -16,8 +16,9 @@ object GameConstants {
     val ENEMY_COMMAND_POST_POSITION = Position(FIELD_WIDTH - 150f, 150f)
     val ENEMY_RADAR_POSITION = Position(FIELD_WIDTH - 300f, 150f)
 
-    // НОВОЕ: Ограничения на юниты
+    // Ограничения на юниты
     const val MAX_MISSILES_PER_PLAYER = 3 // Максимум 3 ракеты на игрока
+    const val MAX_AIR_DEFENSE_PER_PLAYER = 1 // ДОРАБОТКА 1: Максимум 1 зенитка на игрока
 
     // Характеристики юнитов
     val UNIT_STATS = mapOf(
@@ -111,10 +112,9 @@ object GameConstants {
             killReward = 40,
             description = "Солдат с противотанковой ракетой"
         ),
-        // ИЗМЕНЕНО: Ракета теперь стоит 300 очков вместо 60
         UnitType.MISSILE to UnitStats(
             type = UnitType.MISSILE,
-            cost = 300, // Увеличили стоимость с 60 до 300
+            cost = 300,
             health = 30,
             damage = 80,
             range = 300f,
@@ -142,25 +142,25 @@ object GameConstants {
             killReward = 0,
             description = "РЛС для управления войсками"
         ),
-        // НОВЫЙ ЮНИТ: Зенитная установка для перехвата ракет
+        // ДОРАБОТКА 4: Увеличили радиус поражения зенитки с 250f до 350f
         UnitType.AIR_DEFENSE to UnitStats(
             type = UnitType.AIR_DEFENSE,
             cost = 120,
             health = 80,
-            damage = 60,
-            range = 250f,
+            damage = 80, // ДОРАБОТКА 4: Увеличили урон для лучшего уничтожения воздушных целей
+            range = 350f, // ДОРАБОТКА 4: Увеличили радиус поражения
             speed = 0f, // Неподвижная установка
             killReward = 60,
-            description = "Зенитная установка для перехвата ракет и самолетов"
+            description = "Зенитная установка для перехвата авиации и ракет (макс. 1 шт.)"
         )
     )
 
-    // Настройки игры (без изменений)
+    // Настройки игры
     const val ATTACK_COOLDOWN = 1000L // мс между атаками
-    const val AIRPLANE_LIFETIME = 5000L // время жизни самолета
+    const val AIRPLANE_LIFETIME = 5000L // время жизни самолета (больше не используется)
     const val FORTIFICATION_BONUS_HEALTH = 100 // бонус здоровья от укреплений
 
-    // Настройки AI (без изменений)
+    // Настройки AI
     const val AI_SPAWN_PROBABILITY = 0.02f // вероятность спавна врага за тик
     const val AI_MIN_POINTS_TO_SPAWN = 100 // минимум очков для спавна
 }

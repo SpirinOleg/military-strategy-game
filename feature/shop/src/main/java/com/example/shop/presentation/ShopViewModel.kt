@@ -35,7 +35,8 @@ class ShopViewModel : ViewModel() {
             UnitType.RIFLEMAN,
             UnitType.MACHINE_GUNNER,
             UnitType.ROCKET_SOLDIER,
-            UnitType.MISSILE
+            UnitType.MISSILE,
+            UnitType.AIR_DEFENSE // ДОРАБОТКА 1: Добавляем зенитку в магазин
         ).mapNotNull { GameConstants.UNIT_STATS[it] }
 
         _uiState.value = _uiState.value.copy(
@@ -50,6 +51,14 @@ class ShopViewModel : ViewModel() {
             val unitStats = GameConstants.UNIT_STATS[unitType] ?: return@launch
 
             if (currentState.points >= unitStats.cost) {
+                // ДОРАБОТКА 1: Проверяем ограничение на зенитку
+                if (unitType == UnitType.AIR_DEFENSE) {
+                    val currentAirDefenseCount = currentState.purchasedUnits[unitType] ?: 0
+                    if (currentAirDefenseCount >= GameConstants.MAX_AIR_DEFENSE_PER_PLAYER) {
+                        return@launch // Не можем купить больше одной зенитки
+                    }
+                }
+
                 val newPurchasedUnits = currentState.purchasedUnits.toMutableMap()
                 newPurchasedUnits[unitType] = (newPurchasedUnits[unitType] ?: 0) + 1
 
